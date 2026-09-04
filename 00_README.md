@@ -2,8 +2,8 @@
 
 ## Files
 - 00_README.md: wiring, budget, start, resume. orchestrator_prompt.md, worker_prompt.md: system prompts.
-- 01_storage_cleanup_plan.md: Plan 1, 01_storage_report.md. 02_setup_and_repo_fixes_plan.md: Plan 2, 02_setup_report.md. 03_ps_solution_plan.md: Plan 3, ~/drdo_ws.
-- 04_free_model_sources.md: free endpoints per role. 05_gemini_cli_harness.md: harness comparison. 06_gemini_setup_ubuntu.md: install + first run (START HERE). Reports, STATE.md: ~/drdo_setup/reports/
+- 01_storage_cleanup_plan.md: Plan 1, 01_storage_report.md. 02_setup_and_repo_fixes_plan.md: Plan 2, 02_setup_report.md. 03_ps_solution_plan.md: Plan 3, ~/uav_guided_ugv/ws.
+- 04_free_model_sources.md: free endpoints per role. 05_gemini_cli_harness.md: harness comparison. 06_gemini_setup_ubuntu.md: install + first run (START HERE). Reports, STATE.md: ~/uav_guided_ugv/setup/reports/
 
 ## Protocol
 ORCHESTRATOR (reasoning model, never runs commands) reads per turn orchestrator_prompt.md, the plan's "## Orchestrator" section, STATE, new reports; updates STATE, picks the next tree node, dispatches filled TASK CARDS (independent ones batched), batches user questions (sudo, GUI, decisions). WORKER (small model, persistent shell on Ubuntu) sees worker_prompt.md plus ONE card, runs it literally, stops at the first "Stop if", returns ONE WORKER REPORT, never decides or asks (NEEDS_USER). 12 orchestrator turns per plan maximum.
@@ -28,7 +28,7 @@ result: one line
 values: the key: value lines the card asked for
 raw: last 20 lines of the most relevant command output, in a fenced block
 ```
-STATE (top of ~/drdo_setup/reports/STATE.md, under 40 lines):
+STATE (top of ~/uav_guided_ugv/setup/reports/STATE.md, under 40 lines):
 ```
 plan: 1|2|3
 node: current decision-tree node id
@@ -39,26 +39,27 @@ blocked: card: reason
 ask_user: open questions
 ```
 
-## Wiring (chosen): Gemini CLI with Google AI Pro
-- Orchestrator: `gemini -m pro` started in `~/drdo_setup`; `orchestrator_prompt.md` copied to `~/drdo_setup/GEMINI.md`. It writes STATE.md and reports itself (write_file) but runs no shell commands.
-- Worker: subagent `~/.gemini/agents/drdo-worker.md` = YAML header (tools run_shell_command/read_file/write_file/replace/list_directory, flash-class model, temperature 0) + worker_prompt.md as body. Install per 06_gemini_setup_ubuntu.md.
-- Dispatch: the orchestrator sends `@drdo-worker` followed by ONE complete filled card; the subagent returns the WORKER REPORT. One card at a time (parallel subagents unverified). `tier: pro` cards: same subagent, or the orchestrator runs the card itself if the worker fails twice.
-- Approval: `--approval-mode default` (CLI prompts before sudo/delete). No Docker sandbox for Plans 1-2 (they must touch /opt/ros, apt, ~/PX4-Autopilot).
-- sudo: type `!sudo -v` in the CLI (shell passthrough) before a needs: sudo card; it caches ~15 min for that terminal.
+## Wiring (chosen): Antigravity CLI (`agy`) with Google AI Pro
+- Gemini CLI no longer serves individual accounts (since 18 June 2026); Antigravity CLI is its successor and takes the same AI Pro account.
+- Orchestrator: `agy` started in `~/uav_guided_ugv/setup` with a Gemini Pro model (`/model`); `orchestrator_prompt.md` copied to `~/uav_guided_ugv/setup/AGENTS.md`. It writes STATE.md and reports itself but runs no shell commands.
+- Worker: subagent `~/.gemini/config/agents/drdo-worker.md` = YAML header (name, description, model: flash, subagent: true, commandExecutionPolicy: auto) + worker_prompt.md as body. Install per 06_gemini_setup_ubuntu.md.
+- Dispatch: the orchestrator invokes the `drdo-worker` subagent with ONE complete filled card; the subagent returns the WORKER REPORT. One card at a time. `tier: pro` cards: the orchestrator may run the card itself if the worker fails twice.
+- Permissions: `/permissions` = request-review (CLI asks before each command). No sandbox for Plans 1-2.
+- sudo: before a needs: sudo card the orchestrator asks you to run `sudo -v` in the same terminal (caches ~15 min).
 
 ## Wiring (alternative): any OpenAI-compatible endpoint
 - Orchestrator call: system = orchestrator_prompt.md; user = plan "## Orchestrator" section, next cards, STATE.md, new reports, user answers; no tools.
 - Worker call: system = worker_prompt.md; user = one filled card; shell tool on Ubuntu, cwd ~. DeepSeek Harness dsh-crew fits here (tier flash|pro = card tier).
 
 ## Budget
-- Gemini CLI: 1,500 requests/day per AI Pro account (1,000 on a plain account); second account = reserve (`HOME=~/gemini-b gemini`). No hard turn cap; still batch user questions and keep STATE under 40 lines.
+- Antigravity AI Pro: a 5-hour window plus a WEEKLY cap (not per-day); heavy sessions can lock out for days. Worker on `flash`, one card at a time, check `/usage`; second account = separate weekly bucket (06, step 9). Batch user questions; keep STATE under 40 lines.
 - Fallback orchestrator: OpenRouter `z-ai/glm-5.2:free`, 50 requests/day - then the turn budgets in the plan headers apply.
 
 ## Start
-1. `mkdir -p ~/drdo_setup/reports`
+1. `mkdir -p ~/uav_guided_ugv/setup/reports`
 2. Plan 1, 2, 3 in order; first turn STATE: `plan: N`, `node: start`, facts from the previous report.
-3. Before a needs: sudo card type `!sudo -v` in the CLI (cached about 15 min); passwords never enter chat, cards, reports, STATE.md.
-4. Each turn: the orchestrator fills the DISPATCH card from the plan, sends it to `@drdo-worker`, saves the STATE block to STATE.md and the report into reports/ (Gemini CLI: it does this itself with write_file; other wiring: your driver script).
+3. Before a needs: sudo card run `sudo -v` in the terminal when the orchestrator asks (cached about 15 min); passwords never enter chat, cards, reports, STATE.md.
+4. Each turn: the orchestrator fills the DISPATCH card from the plan, invokes the `drdo-worker` subagent with it, saves the STATE block to STATE.md and the report into reports/ (Antigravity: it does this itself; other wiring: your driver script).
 
 ## Resume
 - Read STATE.md; continue at `node`; never re-dispatch `done`.

@@ -1,7 +1,7 @@
 # Plan 3: Solving the problem statement in stages
 Purpose: simulator -> submission: UAV maps road, UGV drives centreline to end on 3 overlay worlds; one command, docs, talk.
-Inputs: 02_setup_report.md setup-facts; fixes merged; `~/drdo_setup/bringup.sh <world>` starts world, rover, PX4, agent, /uav/* bridges; ~/drdo_setup/env.sh sources ~/drdo_ws too.
-Outputs: ~/drdo_ws/src/drdo_uav_ugv; ~/drdo_setup/reports/03_solution_report.md.
+Inputs: 02_setup_report.md setup-facts; fixes merged; `~/uav_guided_ugv/setup/bringup.sh <world>` starts world, rover, PX4, agent, /uav/* bridges; ~/uav_guided_ugv/setup/env.sh sources ~/uav_guided_ugv/ws too.
+Outputs: ~/uav_guided_ugv/ws/src/drdo_uav_ugv; ~/uav_guided_ugv/setup/reports/03_solution_report.md.
 Orchestrator turn budget: none on Gemini CLI (1,500 requests/day); 12 if on a 50/day orchestrator. Dispatch one card at a time.
 
 ## Orchestrator
@@ -71,15 +71,15 @@ Goal: create ament_python package drdo_uav_ugv, stubs, scripts/up.sh.
 Inputs: none
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 sudo apt install -y python3-opencv python3-skimage python3-scipy python3-psutil python3-transforms3d ros-humble-teleop-twist-keyboard
 python3 -c "import cv2;print(cv2.__version__);cv2.aruco.ArucoDetector"
-mkdir -p ~/drdo_ws/src ~/drdo_ws/ref ~/drdo_ws/logs
-cd ~/drdo_ws/src
+mkdir -p ~/uav_guided_ugv/ws/src ~/uav_guided_ugv/ws/ref ~/uav_guided_ugv/ws/logs
+cd ~/uav_guided_ugv/ws/src
 ros2 pkg create drdo_uav_ugv --build-type ament_python --dependencies rclpy px4_msgs sensor_msgs geometry_msgs nav_msgs std_msgs tf2_ros cv_bridge
 mkdir -p drdo_uav_ugv/launch drdo_uav_ugv/config drdo_uav_ugv/rviz drdo_uav_ugv/test drdo_uav_ugv/scripts drdo_uav_ugv/docs
 ```
-setup.py: console_scripts uav_offboard, uav_mission_fsm, aruco_ugv_localizer, road_segmentation, centerline_mapper, path_manager, pure_pursuit, speed_governor, evaluator, validate_pose, marker_px (`name = drdo_uav_ugv.<name>:main`, stub `def main(): pass`); data_files launch, config, rviz. scripts/up.sh (chmod +x): `cd ~/drdo_ws; colcon build --packages-select drdo_uav_ugv; source install/setup.bash; WORLD=$1; shift; ~/drdo_setup/bringup.sh $WORLD > logs/bringup.log 2>&1 & sleep 40; for n in "$@"; do ros2 run drdo_uav_ugv $n > logs/$n.log 2>&1 & sleep 5; done`.
+setup.py: console_scripts uav_offboard, uav_mission_fsm, aruco_ugv_localizer, road_segmentation, centerline_mapper, path_manager, pure_pursuit, speed_governor, evaluator, validate_pose, marker_px (`name = drdo_uav_ugv.<name>:main`, stub `def main(): pass`); data_files launch, config, rviz. scripts/up.sh (chmod +x): `cd ~/uav_guided_ugv/ws; colcon build --packages-select drdo_uav_ugv; source install/setup.bash; WORLD=$1; shift; ~/uav_guided_ugv/setup/bringup.sh $WORLD > logs/bringup.log 2>&1 & sleep 40; for n in "$@"; do ros2 run drdo_uav_ugv $n > logs/$n.log 2>&1 & sleep 5; done`.
 Expect: cv2 >= 4.7, no AttributeError; up.sh prints "1 package finished".
 Stop if: apt E: line; AttributeError; build error.
 Return: cv2_version, build_ok
@@ -89,12 +89,12 @@ Goal: record the ground-truth centreline of {{WORLD}} by teleop.
 Inputs: {{WORLD}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}}
-ros2 topic echo /odom --csv --field pose.pose.position > ~/drdo_ws/ref/{{WORLD}}.csv &
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}}
+ros2 topic echo /odom --csv --field pose.pose.position > ~/uav_guided_ugv/ws/ref/{{WORLD}}.csv &
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
-Return NEEDS_USER: user drives the rover along the road centre to the end, Ctrl-C both; then `wc -l ~/drdo_ws/ref/{{WORLD}}.csv`.
+Return NEEDS_USER: user drives the rover along the road centre to the end, Ctrl-C both; then `wc -l ~/uav_guided_ugv/ws/ref/{{WORLD}}.csv`.
 Expect: > 500 lines; end xy > 50 m from start.
 Stop if: rover z drops > 2 m below spawn z.
 Return: world_name, csv_lines, end_xy
@@ -102,13 +102,13 @@ Return: world_name, csv_lines, end_xy
 ### T3 evaluator node  |  tier: pro  |  needs: none
 Goal: write drdo_uav_ugv/evaluator.py.
 Inputs: {{WORLD}}
-Spec: param world (default {{WORLD}}); ref ~/drdo_ws/ref/<world>.csv xy resampled 0.5 m; out ~/drdo_ws/logs/eval_<world>.csv. Sub /odom, /cmd_vel, /mission/state. 10 Hz: dev = min distance odom xy to ref polyline; elapsed since first |cmd_vel| > 0; psutil cpu_percent and rss summed over processes px4, gz, ros2, python3; publish /eval/deviation; append time,dev,cpu,ram. On state END or dev > 5: print and publish /eval/summary "dev_max= dev_mean= time= cpu_mean= ram_max= finished=yes|no" (finished = odom within 2 m of ref end).
+Spec: param world (default {{WORLD}}); ref ~/uav_guided_ugv/ws/ref/<world>.csv xy resampled 0.5 m; out ~/uav_guided_ugv/ws/logs/eval_<world>.csv. Sub /odom, /cmd_vel, /mission/state. 10 Hz: dev = min distance odom xy to ref polyline; elapsed since first |cmd_vel| > 0; psutil cpu_percent and rss summed over processes px4, gz, ros2, python3; publish /eval/deviation; append time,dev,cpu,ram. On state END or dev > 5: print and publish /eval/summary "dev_max= dev_mean= time= cpu_mean= ram_max= finished=yes|no" (finished = odom within 2 m of ref end).
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}}
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}}
 timeout 30 ros2 run drdo_uav_ugv evaluator --ros-args -p world:={{WORLD}}
-tail -3 ~/drdo_ws/logs/eval_{{WORLD}}.csv
+tail -3 ~/uav_guided_ugv/ws/logs/eval_{{WORLD}}.csv
 ```
 Expect: ~300 rows, dev < 1, cpu > 0.
 Stop if: build error or exception.
@@ -120,12 +120,12 @@ Inputs: {{ALT}}
 Spec frames: ned_to_enu, enu_to_ned, yaw_ned_to_enu, yaw_enu_to_ned, q_frd_to_flu; tests: ned (1,2,-3) -> enu (2,1,3); yaw_ned 0 -> pi/2; round trips. Offboard: QoS BEST_EFFORT, TRANSIENT_LOCAL, KEEP_LAST 1; sub VehicleLocalPosition. 10 Hz: OffboardControlMode(position=True, rest False, timestamp = clock ns // 1000) + TrajectorySetpoint(position=[n,e,d], yaw). After 10 setpoints: VehicleCommand VEHICLE_CMD_DO_SET_MODE param1=1 param2=6, then VEHICLE_CMD_COMPONENT_ARM_DISARM param1=1 (target/source ids 1, from_external True). Default goal current xy, d = -{{ALT}}; sub /uav/goal (map ENU) -> NED. Publish /uav/local_pose ENU, TF map->uav/base_link.
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh drdo_world3_overlay uav_offboard
-python3 -m pytest ~/drdo_ws/src/drdo_uav_ugv/test -q
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh drdo_world3_overlay uav_offboard
+python3 -m pytest ~/uav_guided_ugv/ws/src/drdo_uav_ugv/test -q
 sleep 40
 ros2 topic echo /uav/local_pose --once
-grep -c -i armed ~/drdo_ws/logs/bringup.log
+grep -c -i armed ~/uav_guided_ugv/ws/logs/bringup.log
 ```
 Expect: passed; z = {{ALT}} +-0.5; armed >= 1.
 Stop if: test failed; "Failsafe" or offboard rejected in logs.
@@ -157,8 +157,8 @@ Inputs: {{ARUCO_DICT}}, {{MARKER_SIZE_M}}, {{UAV_SPAWN_XYZ}}
 Spec localizer: ArucoDetector({{ARUCO_DICT}}) on /uav/rgb; object points (+-s/2, +-s/2, 0), s = {{MARKER_SIZE_M}}; cv2.solvePnP SOLVEPNP_IPPE_SQUARE -> tvec optical (z forward, x right, y down) -> camera_link FLU -> tf2 map->uav/camera_link (static param cam_xyz_rpy). Publish /ugv/pose (map; yaw from rvec; minus param marker_offset_z), TF map->ugv/base_link; drop if reprojection error > 2 px. validate_pose: /ugv/pose + param spawn_xyz vs /odom, print err_mean, err_max over 300 samples, exit. marker_px: one /uav/rgb frame, print side_px, exit.
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh drdo_world3_overlay uav_offboard aruco_ugv_localizer
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh drdo_world3_overlay uav_offboard aruco_ugv_localizer
 sleep 40
 ros2 topic hz /ugv/pose --window 50
 timeout 30 ros2 run drdo_uav_ugv marker_px
@@ -171,14 +171,14 @@ Return: pose_hz, marker_px_15m, ugv_pose_err_m, ugv_pose_err_max_m
 ### T7 road segmentation  |  tier: pro  |  needs: gui
 Goal: write road_segmentation.py.
 Inputs: {{WORLD}}
-Spec: /uav/depth (32FC1 m) + /uav/camera_info. Downsample 2x; back-project with fx,fy,cx,cy; normals = normalised cross(dX/du, dX/dv); slope = acos(|n_z|); mask1 = slope < slope_max_deg (8); roughness = 7x7 local std of Z; mask2 = roughness < rough_max_m (0.15); mask = open3, close7 of mask1 & mask2; keep components > min_area_frac (0.02); publish /road/mask mono8 full resolution 5 Hz; save ~/drdo_ws/logs/mask_{{WORLD}}.png every 5 s. Params declared.
+Spec: /uav/depth (32FC1 m) + /uav/camera_info. Downsample 2x; back-project with fx,fy,cx,cy; normals = normalised cross(dX/du, dX/dv); slope = acos(|n_z|); mask1 = slope < slope_max_deg (8); roughness = 7x7 local std of Z; mask2 = roughness < rough_max_m (0.15); mask = open3, close7 of mask1 & mask2; keep components > min_area_frac (0.02); publish /road/mask mono8 full resolution 5 Hz; save ~/uav_guided_ugv/ws/logs/mask_{{WORLD}}.png every 5 s. Params declared.
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}} uav_offboard
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}} uav_offboard
 sleep 40
 timeout 20 ros2 run drdo_uav_ugv road_segmentation
-python3 -c "import cv2;m=cv2.imread('$HOME/drdo_ws/logs/mask_{{WORLD}}.png',0);print('road_frac',(m>0).mean())"
+python3 -c "import cv2;m=cv2.imread('$HOME/uav_guided_ugv/ws/logs/mask_{{WORLD}}.png',0);print('road_frac',(m>0).mean())"
 ```
 Expect: road_frac 0.05-0.4; user confirms the band lies on the road.
 Stop if: road_frac 0 or > 0.6.
@@ -189,11 +189,11 @@ Goal: run road_segmentation unchanged on {{WORLD}}.
 Inputs: {{WORLD}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}} uav_offboard
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}} uav_offboard
 sleep 40
 timeout 20 ros2 run drdo_uav_ugv road_segmentation
-python3 -c "import cv2;m=cv2.imread('$HOME/drdo_ws/logs/mask_{{WORLD}}.png',0);print('road_frac',(m>0).mean())"
+python3 -c "import cv2;m=cv2.imread('$HOME/uav_guided_ugv/ws/logs/mask_{{WORLD}}.png',0);print('road_frac',(m>0).mean())"
 ```
 Expect: road_frac 0.05-0.4; user confirms band on road.
 Stop if: road_frac 0 or > 0.6.
@@ -202,22 +202,22 @@ Return: world_name, mask_ok, road_frac
 ### T9 centreline mapper + path manager + RViz  |  tier: pro  |  needs: gui
 Goal: write centerline_mapper.py, path_manager.py, launch/perception.launch.py, config/params.yaml, rviz/drdo.rviz.
 Inputs: {{WORLD}}, {{UAV_SPAWN_XYZ}}
-Spec mapper: skimage.morphology.skeletonize(mask > 0); skeleton pixels + depth -> camera XYZ -> map via TF; accumulate; voxel-downsample 1 m; chain by nearest neighbour from /ugv/pose; drop branches < 5 m; scipy.interpolate.splprep smoothing -> 0.5 m samples; publish /map/centerline 2 Hz; write ~/drdo_ws/logs/centerline_{{WORLD}}.csv x,y,z. path_manager: /ugv/path = centreline from nearest point to UGV onward, 5 Hz. Launch: uav_offboard, aruco_ugv_localizer, road_segmentation, centerline_mapper, path_manager + params.yaml. RViz: TF, /map/centerline green, /ugv/path blue, /ugv/pose, /road/mask, /uav/rgb.
+Spec mapper: skimage.morphology.skeletonize(mask > 0); skeleton pixels + depth -> camera XYZ -> map via TF; accumulate; voxel-downsample 1 m; chain by nearest neighbour from /ugv/pose; drop branches < 5 m; scipy.interpolate.splprep smoothing -> 0.5 m samples; publish /map/centerline 2 Hz; write ~/uav_guided_ugv/ws/logs/centerline_{{WORLD}}.csv x,y,z. path_manager: /ugv/path = centreline from nearest point to UGV onward, 5 Hz. Launch: uav_offboard, aruco_ugv_localizer, road_segmentation, centerline_mapper, path_manager + params.yaml. RViz: TF, /map/centerline green, /ugv/path blue, /ugv/pose, /road/mask, /uav/rgb.
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}}
-nohup ros2 launch drdo_uav_ugv perception.launch.py > ~/drdo_ws/logs/perc.log 2>&1 &
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh {{WORLD}}
+nohup ros2 launch drdo_uav_ugv perception.launch.py > ~/uav_guided_ugv/ws/logs/perc.log 2>&1 &
 sleep 60
 python3 - <<'EOF'
 import numpy as np, os
-h=os.path.expanduser('~/drdo_ws')
+h=os.path.expanduser('~/uav_guided_ugv/ws')
 c=np.loadtxt(f'{h}/logs/centerline_{{WORLD}}.csv',delimiter=',')[:,:2]+np.array([{{UAV_SPAWN_XYZ}}])[:2]
 r=np.loadtxt(f'{h}/ref/{{WORLD}}.csv',delimiter=',')[:,:2]
 d=[np.min(np.linalg.norm(r-p,axis=1)) for p in c]
 print('n',len(c),'rms',np.sqrt(np.mean(np.square(d))),'max',np.max(d))
 EOF
-rviz2 -d ~/drdo_ws/src/drdo_uav_ugv/rviz/drdo.rviz
+rviz2 -d ~/uav_guided_ugv/ws/src/drdo_uav_ugv/rviz/drdo.rviz
 ```
 Expect: n >= 30, rms <= 1.0; user sees the green centreline on the road.
 Stop if: csv missing after 60 s.
@@ -229,14 +229,14 @@ Inputs: none
 Spec pp: L = clamp(k_l*v, 1.5, 4.0); target = first /ugv/path point at distance >= L; alpha = heading error from /ugv/pose yaw; curvature = 2 sin(alpha)/L; /cmd_vel_raw linear.x = v_cmd, angular.z = v_cmd*curvature, 20 Hz; zero when /ugv/enable false or path older than 2 s. Governor: v_cmd = clip(v_max*(1 - |curvature|/curv_max), v_min, v_max), v_max 1.5, v_min 0.4, curv_max 0.5; cross-track > 2 m or path end within 1 m -> 0; publish /cmd_vel. No /odom.
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh drdo_world3_overlay evaluator pure_pursuit speed_governor
-nohup ros2 launch drdo_uav_ugv perception.launch.py > ~/drdo_ws/logs/perc.log 2>&1 &
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh drdo_world3_overlay evaluator pure_pursuit speed_governor
+nohup ros2 launch drdo_uav_ugv perception.launch.py > ~/uav_guided_ugv/ws/logs/perc.log 2>&1 &
 sleep 60
 ros2 topic pub --once /ugv/enable std_msgs/msg/Bool "{data: true}"
 sleep 60
 ros2 topic pub --once /ugv/enable std_msgs/msg/Bool "{data: false}"
-python3 -c "import numpy as np;d=np.loadtxt('$HOME/drdo_ws/logs/eval_drdo_world3_overlay.csv',delimiter=',',skiprows=1);print('dev_max',d[:,1].max(),'dev_mean',d[:,1].mean())"
+python3 -c "import numpy as np;d=np.loadtxt('$HOME/uav_guided_ugv/ws/logs/eval_drdo_world3_overlay.csv',delimiter=',',skiprows=1);print('dev_max',d[:,1].max(),'dev_mean',d[:,1].mean())"
 ```
 Expect: dev_max <= 1.5; rover moved.
 Stop if: dev_max > 5.
@@ -245,14 +245,14 @@ Return: pp_max_dev_m, pp_mean_dev_m
 ### T11 mission FSM + one-command run  |  tier: pro  |  needs: none
 Goal: write uav_mission_fsm.py, launch/mission.launch.py (arg world: perception + pure_pursuit + speed_governor + fsm + evaluator world:=world), scripts/run.sh.
 Inputs: {{ALT}}
-Spec FSM (/mission/state 5 Hz): TAKEOFF: /uav/goal = spawn xy, z {{ALT}} -> ACQUIRE at |z err| < 0.5. ACQUIRE -> MAP_AHEAD when /ugv/pose age < 1 s for 2 s. MAP_AHEAD: goal = UGV + 20 m along /ugv/path tangent (UGV yaw if empty) -> RELEASE when path past UGV > 15 m. RELEASE: /ugv/enable true -> LEAD. LEAD: goal = path point 10 m ahead of UGV, z = UAV z - centre depth + {{ALT}}; marker age > 1 s -> LOST. LOST: enable false, goal = last UGV pose; marker back -> LEAD; > 30 s -> HOLD. END when far third of /road/mask < 1 % road for 5 s and UGV within 2 m of path end: enable false, hover. run.sh: copy ~/drdo_setup/env.sh and bringup.sh into scripts/; `set -e; WORLD=${1:-drdo_world1_overlay}; source scripts/env.sh; scripts/bringup.sh $WORLD` backgrounded with log; sleep 40; `ros2 launch drdo_uav_ugv mission.launch.py world:=$WORLD`.
+Spec FSM (/mission/state 5 Hz): TAKEOFF: /uav/goal = spawn xy, z {{ALT}} -> ACQUIRE at |z err| < 0.5. ACQUIRE -> MAP_AHEAD when /ugv/pose age < 1 s for 2 s. MAP_AHEAD: goal = UGV + 20 m along /ugv/path tangent (UGV yaw if empty) -> RELEASE when path past UGV > 15 m. RELEASE: /ugv/enable true -> LEAD. LEAD: goal = path point 10 m ahead of UGV, z = UAV z - centre depth + {{ALT}}; marker age > 1 s -> LOST. LOST: enable false, goal = last UGV pose; marker back -> LEAD; > 30 s -> HOLD. END when far third of /road/mask < 1 % road for 5 s and UGV within 2 m of path end: enable false, hover. run.sh: copy ~/uav_guided_ugv/setup/env.sh and bringup.sh into scripts/; `set -e; WORLD=${1:-drdo_world1_overlay}; source scripts/env.sh; scripts/bringup.sh $WORLD` backgrounded with log; sleep 40; `ros2 launch drdo_uav_ugv mission.launch.py world:=$WORLD`.
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-~/drdo_ws/src/drdo_uav_ugv/scripts/up.sh
-nohup ~/drdo_ws/src/drdo_uav_ugv/scripts/run.sh drdo_world3_overlay > ~/drdo_ws/logs/mission.log 2>&1 &
+source ~/uav_guided_ugv/setup/env.sh
+~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/up.sh
+nohup ~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/run.sh drdo_world3_overlay > ~/uav_guided_ugv/ws/logs/mission.log 2>&1 &
 timeout 900 ros2 topic echo /eval/summary --once
-grep -o "state: [A-Z_]*" ~/drdo_ws/logs/mission.log | uniq
+grep -o "state: [A-Z_]*" ~/uav_guided_ugv/ws/logs/mission.log | uniq
 ```
 Expect: finished=yes, dev_max <= 3, states end with END.
 Stop if: dev_max > 5 or no summary in 900 s.
@@ -263,7 +263,7 @@ Goal: find ground-truth leaks and per-world constants in control nodes.
 Inputs: none
 Run:
 ```bash
-cd ~/drdo_ws/src/drdo_uav_ugv/drdo_uav_ugv
+cd ~/uav_guided_ugv/ws/src/drdo_uav_ugv/drdo_uav_ugv
 grep -n "/odom" *.py | grep -v -E "evaluator|validate" | wc -l
 grep -n -E "world[123]|311\.8|101\.47|265\.66" *.py | grep -v -E "evaluator|validate" | wc -l
 grep -n -E "^[^#]*= *[0-9]+\.[0-9]+" *.py | grep -v -E "parameter|evaluator|validate" | head -20
@@ -277,8 +277,8 @@ Goal: end-to-end run on {{WORLD}}; record numbers.
 Inputs: {{WORLD}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-nohup ~/drdo_ws/src/drdo_uav_ugv/scripts/run.sh {{WORLD}} > ~/drdo_ws/logs/mission_{{WORLD}}.log 2>&1 &
+source ~/uav_guided_ugv/setup/env.sh
+nohup ~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/run.sh {{WORLD}} > ~/uav_guided_ugv/ws/logs/mission_{{WORLD}}.log 2>&1 &
 timeout 900 ros2 topic echo /eval/summary --once
 pkill -f mission.launch
 pkill -f bringup.sh
@@ -292,8 +292,8 @@ Goal: occlude the marker during LEAD; UGV must stop, then recover.
 Inputs: none
 Run:
 ```bash
-source ~/drdo_setup/env.sh
-nohup ~/drdo_ws/src/drdo_uav_ugv/scripts/run.sh drdo_world3_overlay > ~/drdo_ws/logs/mission_occ.log 2>&1 &
+source ~/uav_guided_ugv/setup/env.sh
+nohup ~/uav_guided_ugv/ws/src/drdo_uav_ugv/scripts/run.sh drdo_world3_overlay > ~/uav_guided_ugv/ws/logs/mission_occ.log 2>&1 &
 sleep 190
 X=$(ros2 topic echo /odom --once --field pose.pose.position.x)
 Y=$(ros2 topic echo /odom --once --field pose.pose.position.y)
@@ -302,19 +302,19 @@ sleep 5
 ros2 topic echo /cmd_vel --once
 gz service -s /world/drdo_world3_overlay/remove --reqtype gz.msgs.Entity --reptype gz.msgs.Boolean --timeout 2000 --req 'name: "occluder" type: MODEL'
 sleep 10
-grep -o "state: [A-Z_]*" ~/drdo_ws/logs/mission_occ.log | uniq | tail -4
+grep -o "state: [A-Z_]*" ~/uav_guided_ugv/ws/logs/mission_occ.log | uniq | tail -4
 ```
 Expect: /cmd_vel zero while occluded; LEAD -> LOST -> LEAD.
 Stop if: rover moving 5 s after occlusion.
 Return: occlusion_ok, states_tail
 
 ### T15 docs + talk  |  tier: flash  |  needs: none
-Goal: write README.md, docs/ALGORITHM.md, docs/TALK.md in ~/drdo_ws/src/drdo_uav_ugv.
+Goal: write README.md, docs/ALGORITHM.md, docs/TALK.md in ~/uav_guided_ugv/ws/src/drdo_uav_ugv.
 Inputs: {{PX4_TAG}}, {{GZ_VERSION}}, {{W1}}, {{W2}}, {{W3}} (dev/time/cpu strings)
-README: Requirements (Ubuntu 22.04, ROS 2 Humble, gz-sim {{GZ_VERSION}}, ros-humble-ros-gzharmonic, PX4 {{PX4_TAG}}, px4_msgs, Micro-XRCE-DDS-Agent v2.4.2, python deps); Install (exact lines from ~/drdo_setup/reports/02_setup_report.md); Run (`scripts/run.sh <world>`); Topics; Results {{W1}} {{W2}} {{W3}}; License. ALGORITHM.md: pipeline, per-node steps, params, frames, failure handling, compute. TALK.md, 10 slides x 1 min: problem + scoring; live RViz centreline overlay, world 3; architecture; depth segmentation (texture-free); ArUco numbers; FSM; results; compute; failures; next steps.
+README: Requirements (Ubuntu 22.04, ROS 2 Humble, gz-sim {{GZ_VERSION}}, ros-humble-ros-gzharmonic, PX4 {{PX4_TAG}}, px4_msgs, Micro-XRCE-DDS-Agent v2.4.2, python deps); Install (exact lines from ~/uav_guided_ugv/setup/reports/02_setup_report.md); Run (`scripts/run.sh <world>`); Topics; Results {{W1}} {{W2}} {{W3}}; License. ALGORITHM.md: pipeline, per-node steps, params, frames, failure handling, compute. TALK.md, 10 slides x 1 min: problem + scoring; live RViz centreline overlay, world 3; architecture; depth segmentation (texture-free); ArUco numbers; FSM; results; compute; failures; next steps.
 Run:
 ```bash
-cd ~/drdo_ws/src/drdo_uav_ugv
+cd ~/uav_guided_ugv/ws/src/drdo_uav_ugv
 wc -w README.md docs/ALGORITHM.md docs/TALK.md
 ```
 Expect: 400-1200, 400-1200, 300-700 words.
@@ -326,10 +326,10 @@ Goal: follow README literally in a fresh workspace; run world 2.
 Inputs: none
 Run:
 ```bash
-rm -rf ~/drdo_ws_test
-mkdir -p ~/drdo_ws_test/src
-cp -r ~/drdo_ws/src/drdo_uav_ugv ~/drdo_ws_test/src/
-cd ~/drdo_ws_test
+rm -rf ~/uav_guided_ugv/ws_test
+mkdir -p ~/uav_guided_ugv/ws_test/src
+cp -r ~/uav_guided_ugv/ws/src/drdo_uav_ugv ~/uav_guided_ugv/ws_test/src/
+cd ~/uav_guided_ugv/ws_test
 source /opt/ros/humble/setup.bash
 source ~/px4_ros_ws/install/setup.bash
 source ~/training_pool/install/setup.bash

@@ -1,6 +1,8 @@
-# Gemini CLI as the harness (instead of, or alongside, DeepSeek Harness)
+# Gemini CLI / Antigravity CLI as the harness (instead of, or alongside, DeepSeek Harness)
 
-Verified Sept 2026 against geminicli.com docs.
+**Update:** Gemini CLI stopped serving individual accounts on 18 June 2026. Everything below applies to its successor **Antigravity CLI (`agy`)**, which keeps the same shape: `AGENTS.md` instructions, subagents in `~/.gemini/config/agents/<name>.md` (fields: name, description, model inherit|flash|pro, commandExecutionPolicy off|auto|eager|sandbox, tools, mcpServers), parent invokes them via `invoke_subagent`, concurrent, isolated context, result message back. Permissions: `/permissions` request-review | always-proceed | strict. MCP via `mcp_config.json`. Setup: `06_gemini_setup_ubuntu.md`. dsh-crew already ships an Antigravity MCP installer (`node src/install/cli.mjs agy`), so DeepSeek workers plug in natively if ever wanted.
+
+Original comparison (Gemini CLI, Sept 2026) kept for reference:
 
 ## What Gemini CLI has
 
@@ -42,11 +44,11 @@ timeout_mins: 30
 <paste the full contents of worker_prompt.md here>
 ```
 
-Then, in `~/drdo_setup`:
+Then, in `~/uav_guided_ugv/setup`:
 
-1. Copy `orchestrator_prompt.md` to `~/drdo_setup/GEMINI.md` (Gemini CLI loads it as project instructions).
-2. `cd ~/drdo_setup && gemini -m pro`
-3. First message: `Run Plan 1 from ~/drdo_plans/01_storage_cleanup_plan.md. Dispatch every task card to @drdo-worker with placeholders filled in. Keep ~/drdo_setup/reports/STATE.md updated. Ask me before any Tier-2 card.`
+1. Copy `orchestrator_prompt.md` to `~/uav_guided_ugv/setup/GEMINI.md` (Gemini CLI loads it as project instructions).
+2. `cd ~/uav_guided_ugv/setup && gemini -m pro`
+3. First message: `Run Plan 1 from ~/uav_guided_ugv/plans/01_storage_cleanup_plan.md. Dispatch every task card to @drdo-worker with placeholders filled in. Keep ~/uav_guided_ugv/setup/reports/STATE.md updated. Ask me before any Tier-2 card.`
 
 Notes:
 - Check tool names with `/tools` inside the CLI before trusting the list above - they have been renamed before. `/mcp` lists MCP tools, `/about` shows the account.
@@ -63,4 +65,4 @@ dsh-crew's Antigravity installer (`node src/install/cli.mjs agy`) writes an MCP 
 
 ## Two AI Pro accounts
 
-Terminal A: `gemini` (account A = orchestrator + its subagents, 1,500/day). Terminal B: `HOME=~/gemini-b gemini` (account B) as the reserve when A's quota runs out, or as a second worker pool fed through `~/drdo_setup/queue/` files. See `04_free_model_sources.md` for login details.
+Terminal A: `gemini` (account A = orchestrator + its subagents, 1,500/day). Terminal B: `HOME=~/gemini-b gemini` (account B) as the reserve when A's quota runs out, or as a second worker pool fed through `~/uav_guided_ugv/setup/queue/` files. See `04_free_model_sources.md` for login details.

@@ -5,7 +5,7 @@ Execute ONE task card on the user's Ubuntu 22.04 machine via a shell tool; retur
 
 ## Rules
 0. Before command 1: any `{{` left, an empty Inputs value, or rm/purge/lvextend/resize2fs/mkfs/dd/git-reset aimed at `/`, `~`, `/home`, `/boot`, `/opt/ros/humble`, `/swapfile`, `/dev/*`, `/media`, `/mnt` or nothing: run nothing, BLOCKED, result = that line.
-1. Commands in order, wait for each. Your shell (run_shell_command) does not keep `cd`/`source`/`export` between calls: run the whole Run block as ONE call (join lines with newlines). For `gz sim`, `px4`, `MicroXRCEAgent` and any command the card marks background, use `is_background: true` instead of `nohup ... &`.
+1. Commands in order, wait for each. Assume your terminal tool does not keep `cd`/`source`/`export` between calls: run the whole Run block as ONE call (join lines with newlines). For `gz sim`, `px4`, `MicroXRCEAgent` and any command the card marks background, keep the card's `nohup ... > log 2>&1 &` form, or the tool's background option if it has one.
 2. Never add, change, reorder, skip a command; never invent flags, paths, packages.
 3. sudo only if the header says `needs: sudo`; never type, echo, report a password; never `sudo -S`.
 4. Never delete, overwrite, edit anything the card does not name; a file the card specifies, write fully.
@@ -34,7 +34,7 @@ result: one line
 values: the key: value lines the card asked for
 raw: last 20 lines of the most relevant command output, in a fenced block
 ```
-STATE: orchestrator-owned file ~/drdo_setup/reports/STATE.md; you never read or write it.
+STATE: orchestrator-owned file ~/uav_guided_ugv/setup/reports/STATE.md; you never read or write it.
 
 ## Example report
 ````

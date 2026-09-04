@@ -1,153 +1,115 @@
-# Gemini CLI setup on Ubuntu 22.04 for the DRDO plan pack
+# Antigravity CLI setup on Ubuntu 22.04 for the DRDO plan pack
 
-Do this once, on the laptop's own screen (not over SSH). ~20 minutes.
+Gemini CLI stopped serving individual (free / AI Pro / AI Ultra) accounts on 18 June 2026. Its replacement is Antigravity CLI (`agy`). Your Jio Google AI Pro is a normal AI Pro subscription on that Google account and gets Antigravity's Pro tier. Do this once, at the laptop's own screen. ~15 minutes.
 
 ## 1. Get the pack onto Ubuntu
 
-Copy the `drdo_plans` folder to `~/drdo_plans` (OneDrive web download, USB, or `git clone` if you push it to a repo). Then:
+Copy this whole `uav_guided_ugv` folder (the one holding these .md files) to `~/uav_guided_ugv/plans` on Ubuntu (OneDrive web, USB, or git). Everything the project creates lives beside it: `~/uav_guided_ugv/setup` (env.sh, bringup.sh, reports, logs) and `~/uav_guided_ugv/ws` (the ROS workspace). Then:
 
 ```bash
-mkdir -p ~/drdo_setup/reports ~/drdo_setup/logs ~/.gemini/agents
-ls ~/drdo_plans
+mkdir -p ~/uav_guided_ugv/setup/reports ~/uav_guided_ugv/setup/logs ~/.gemini/config/agents
+ls ~/uav_guided_ugv/plans
 ```
 
-Expect: `00_README.md 01_... 02_... 03_... orchestrator_prompt.md worker_prompt.md` plus the 04/05/06 files.
-
-## 2. Node 22 and Gemini CLI
-
-Ubuntu's apt Node is 12 - too old. Use nvm:
+## 2. Install Antigravity CLI
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
 
 ```bash
-source ~/.bashrc && nvm install 22 && node -v
+source ~/.bashrc; agy --version
 ```
 
-Expect: `v22.x`.
+## 3. Sign in with account A (the Jio AI Pro Gmail)
 
 ```bash
-npm install -g @google/gemini-cli && gemini --version
+cd ~/uav_guided_ugv/setup && agy
 ```
 
-## 3. Sign in with account A (the Jio AI Pro one)
+A browser opens; pick the Gmail that redeemed the Jio offer; approve. Credentials go into the system keyring (Secret Service on Ubuntu), so it stays signed in. Inside the CLI: `/usage` shows "Five Hour Limit Remaining" and "Weekly Limit Remaining" - if you see both, the Pro tier is active. `/model` picks the default reasoning model: choose a Gemini Pro model for the orchestrator. `/quit`.
 
-```bash
-cd ~/drdo_setup && gemini
-```
-
-- Choose **Sign in with Google**. A browser opens; pick the Gmail that redeemed the Jio offer; approve.
-- Back in the CLI type `/about` - it should show the auth method and that account.
-- Do NOT set `GOOGLE_CLOUD_PROJECT`; that is for Workspace accounts.
-- `/quit`.
-
-If the browser does not open: `NO_BROWSER=true gemini` prints a URL to open on any device and asks for the code. (This flow has had bugs; the normal browser flow is preferred.)
+Over SSH with no screen it prints a URL + code instead of opening a browser.
 
 ## 4. Install the worker subagent
 
-Create `~/.gemini/agents/drdo-worker.md` with exactly this header, then paste the whole of `~/drdo_plans/worker_prompt.md` below the second `---`:
-
-```markdown
----
-name: drdo-worker
-description: Executes exactly one DRDO task card literally and returns a WORKER REPORT. Use for every task card.
-kind: local
-tools:
-  - run_shell_command
-  - read_file
-  - write_file
-  - replace
-  - list_directory
-model: gemini-3-flash-preview
-temperature: 0
-max_turns: 15
-timeout_mins: 30
----
-```
-
-One command does it:
+Antigravity discovers subagents in `~/.gemini/config/agents/<name>.md` (global) or `.agents/agents/<name>.md` (per workspace). Build it from worker_prompt.md:
 
 ```bash
 { cat <<'EOF'
 ---
 name: drdo-worker
-description: Executes exactly one DRDO task card literally and returns a WORKER REPORT. Use for every task card.
-kind: local
-tools:
-  - run_shell_command
-  - read_file
-  - write_file
-  - replace
-  - list_directory
-model: gemini-3-flash-preview
-temperature: 0
-max_turns: 15
-timeout_mins: 30
+description: Executes exactly ONE DRDO task card literally (shell commands in order, stop at Stop if) and returns ONE WORKER REPORT. Use for every task card the orchestrator dispatches.
+model: flash
+subagent: true
+mainAgent: false
+commandExecutionPolicy: auto
 ---
 EOF
-cat ~/drdo_plans/worker_prompt.md; } > ~/.gemini/agents/drdo-worker.md
+cat ~/uav_guided_ugv/plans/worker_prompt.md; } > ~/.gemini/config/agents/drdo-worker.md
 ```
 
-## 5. Make the orchestrator prompt the project instructions
+`model: flash` keeps worker turns cheap against the weekly cap. `commandExecutionPolicy: auto` lets it run shell commands but the CLI's permission mode (step 6) still gates sudo/delete. If `agy` rejects a field, remove that line; only `name` and `description` are required.
+
+## 5. Orchestrator instructions
+
+Antigravity reads `AGENTS.md` from the directory you start it in:
 
 ```bash
-cp ~/drdo_plans/orchestrator_prompt.md ~/drdo_setup/GEMINI.md
+cp ~/uav_guided_ugv/plans/orchestrator_prompt.md ~/uav_guided_ugv/setup/AGENTS.md
 ```
 
-Gemini CLI loads `GEMINI.md` from the directory you start it in.
+## 6. Permissions
 
-## 6. Settings
-
-`~/.gemini/settings.json` - create if missing:
+Inside `agy`, run `/permissions` and choose **request-review** (asks before each command). Do NOT use always-proceed or `--dangerously-skip-permissions` on Plans 1-2. Optional hard denies in `~/.gemini/antigravity-cli/settings.json`:
 
 ```json
-{
-  "experimental": { "enableAgents": true }
-}
+{ "permissions": { "deny": ["command(rm -rf /)", "command(mkfs)", "command(dd )", "command(parted)", "command(gparted)"] } }
 ```
 
-Do NOT enable the Docker sandbox for Plans 1 and 2: it confines writes to the project folder, and those plans must touch `/opt/ros`, apt, `~/PX4-Autopilot`. Rely on the approval prompts instead (below). The sandbox is fine for Plan 3 coding cards if you want it.
+Do not enable a sandbox for Plans 1-2 (they must touch /opt/ros, apt, ~/PX4-Autopilot).
 
 ## 7. Smoke test
 
 ```bash
-cd ~/drdo_setup && gemini -m pro
+cd ~/uav_guided_ugv/setup && agy
 ```
 
-Inside the CLI:
-
-- `/tools` - confirm `run_shell_command`, `read_file`, `write_file`, `replace` exist (names have changed before; fix the subagent file if they differ).
-- `@drdo-worker run: df -h and return a WORKER REPORT with card T0` - you should get back the report format from worker_prompt.md. If `@drdo-worker` is not recognised, re-check step 4 and 6.
-- If the CLI complains about `model:` in the subagent file, delete that line (the worker then uses the parent model).
+- `/agents` - confirm `drdo-worker` is listed.
+- Say: `Use the drdo-worker subagent to run this card and return only its WORKER REPORT:` then paste a trivial card (`### T0 test | tier: flash | needs: none`, Run: `df -h /`, Expect: one / row, Return: free_gb). You should get the report format from worker_prompt.md back.
+- `/usage` to see what that cost.
 
 ## 8. Run Plan 1
 
-Still in `gemini -m pro`, with `--approval-mode` left at `default` (the CLI will prompt you before sudo/delete commands - say yes only when the card and the report make sense):
+Still in `agy` (request-review on):
 
 ```
-Run Plan 1 from ~/drdo_plans/01_storage_cleanup_plan.md. Dispatch every task card to @drdo-worker with placeholders filled in, one card at a time. Keep ~/drdo_setup/reports/STATE.md updated after every report. Ask me before any Tier-2 card. Start with the sense cards.
+Read ~/uav_guided_ugv/plans/01_storage_cleanup_plan.md. Run Plan 1: dispatch every task card to the drdo-worker subagent with placeholders filled in, one card at a time, and keep ~/uav_guided_ugv/setup/reports/STATE.md updated after each report. Ask me before any Tier-2 card. Before a needs: sudo card, ask me to run `sudo -v` in this terminal. Start with the sense cards.
 ```
 
-Then Plan 2, then Plan 3, the same way. Resume after a crash: start `gemini` in `~/drdo_setup`, say `Read ~/drdo_setup/reports/STATE.md and continue Plan N`.
+Then Plan 2, then Plan 3 the same way. Resume after a crash: `cd ~/uav_guided_ugv/setup && agy`, then `Read ~/uav_guided_ugv/setup/reports/STATE.md and continue Plan N`.
 
-## 9. Account B (reserve)
+## 9. Account B (reserve, separate weekly bucket)
 
-Only when account A returns quota errors:
+Credentials live in the OS keyring, so the clean way to hold a second account is a second Linux user:
 
 ```bash
-mkdir -p ~/gemini-b/.gemini && cp -r ~/.gemini/agents ~/.gemini/settings.json ~/gemini-b/.gemini/
-HOME=~/gemini-b gemini
+sudo adduser drdo2 && sudo usermod -aG sudo drdo2
 ```
 
-Sign in with the second Jio account. Run it from `~/drdo_setup` too - it sees the same `GEMINI.md` and `STATE.md`. Do not run both accounts on the same plan at the same time; they would race on STATE.md.
+Log in as `drdo2` (or `su - drdo2` in a terminal), install `agy` again (step 2), sign in with the second Jio Gmail, and repeat steps 4-6 there. Give it read access to the shared folders: keep `~/uav_guided_ugv/setup` and the workspaces under the first user and run account B only for Plan 3 coding cards, or when account A shows 0% weekly. Simpler fallback: in account A's CLI run `/logout`, restart `agy`, sign in as B, `/logout` again later - one account at a time, no second Linux user.
+
+## Quota reality
+
+Pro has a 5-hour window and a weekly cap; users report multi-day lockouts after heavy sessions. Habits that matter: worker on `flash`; one card at a time; never `-a`-style "do everything" prompts; check `/usage` before a long PX4-build day; switch to account B at ~20% weekly remaining, not 0%.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| `/auth` keeps logging the same account | quit; `rm ~/.gemini/oauth_creds.json` (and `google_accounts.json` if present); start again |
-| Worker times out on `make px4_sitl` | that card must run the build with `is_background: true` / `nohup` and a later card reads the log - check the card, do not raise the timeout to an hour |
-| Worker "improves" a command | it must not; paste the WORKER REPORT rules back and re-dispatch; if it repeats, lower `max_turns` to 10 |
-| 429 / quota exhausted | switch to account B (step 9) or wait for the daily reset |
-| Plan says `[ASK USER]` but nothing was asked | the orchestrator skipped a rule - tell it: `You must ask me before Tier-2 cards. Show STATE.md.` |
+| Browser never opens at sign-in | copy the printed URL to any browser, paste the code back |
+| `/agents` does not list drdo-worker | check the file path (`~/.gemini/config/agents/drdo-worker.md`) and that frontmatter has `name` + `description`; remove unknown fields |
+| Worker asks the user in prose instead of NEEDS_USER | re-send: "Return only the WORKER REPORT format"; if it repeats, put `Return only the WORKER REPORT` at the top of the card |
+| Worker times out on `make px4_sitl` | the card must background the build with a log; a later card reads the log |
+| Quota exhausted mid-plan | STATE.md is on disk; switch account (step 9) and say `continue Plan N from STATE.md` |
+| Old Gemini CLI still installed | `npm uninstall -g @google/gemini-cli`; it no longer serves personal accounts |

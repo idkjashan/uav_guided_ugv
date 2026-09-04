@@ -2,7 +2,7 @@
 
 Purpose: Harmonic + bridge + PX4 v1.16.x + px4_msgs/agent + Training_Pool working; fixes B1, B4a, B2, B3, README on branch `fixes`; `bringup.sh <world>`.
 Inputs: Plan 1 STATE facts if present; user at the machine.
-Outputs: `~/drdo_setup/env.sh`, `~/drdo_setup/bringup.sh`, `~/drdo_setup/reports/02_setup_report.md`.
+Outputs: `~/uav_guided_ugv/setup/env.sh`, `~/uav_guided_ugv/setup/bringup.sh`, `~/uav_guided_ugv/setup/reports/02_setup_report.md`.
 Orchestrator turn budget: none on Gemini CLI (1,500 requests/day); 12 if on a 50/day orchestrator. Dispatch one card at a time.
 
 ## Orchestrator
@@ -13,7 +13,7 @@ Rules
 3. `free_gb < 15` -> stop, send user to Plan 1.
 4. FAILED/BLOCKED -> ask user; never re-dispatch an unchanged card.
 5. Batch open user questions into one message.
-6. Long processes are backgrounded with logs in `~/drdo_setup/logs/`; later cards read them.
+6. Long processes are backgrounded with logs in `~/uav_guided_ugv/setup/logs/`; later cards read them.
 7. After each verified fix, dispatch T33 with a one-line log entry (batch with the next fix card).
 8. Verify = re-dispatch T13/T14/T15/T16/T17/T19/T20/T22 with new inputs.
 
@@ -168,13 +168,13 @@ Goal: Build SITL, run stock gz_x500 once.
 Inputs: none
 Run:
 ```bash
-mkdir -p ~/drdo_setup/logs ~/drdo_setup/reports
+mkdir -p ~/uav_guided_ugv/setup/logs ~/uav_guided_ugv/setup/reports
 cd ~/PX4-Autopilot
-make px4_sitl > ~/drdo_setup/logs/px4_build.log 2>&1
-tail -3 ~/drdo_setup/logs/px4_build.log
-nohup make px4_sitl gz_x500 > ~/drdo_setup/logs/px4_smoke.log 2>&1 &
+make px4_sitl > ~/uav_guided_ugv/setup/logs/px4_build.log 2>&1
+tail -3 ~/uav_guided_ugv/setup/logs/px4_build.log
+nohup make px4_sitl gz_x500 > ~/uav_guided_ugv/setup/logs/px4_smoke.log 2>&1 &
 sleep 90
-grep -c 'Ready for takeoff' ~/drdo_setup/logs/px4_smoke.log
+grep -c 'Ready for takeoff' ~/uav_guided_ugv/setup/logs/px4_smoke.log
 ```
 Expect: count >= 1; Gazebo window with a quadrotor.
 Stop if: build log ends with `Error`.
@@ -191,8 +191,8 @@ cd ~/px4_ros_ws/src
 git clone -b {{PX4_MSGS_BRANCH}} https://github.com/PX4/px4_msgs.git
 git clone -b v2.4.2 https://github.com/eProsima/Micro-XRCE-DDS-Agent.git
 cd ~/px4_ros_ws
-colcon build > ~/drdo_setup/logs/px4_ros_ws_build.log 2>&1
-tail -3 ~/drdo_setup/logs/px4_ros_ws_build.log
+colcon build > ~/uav_guided_ugv/setup/logs/px4_ros_ws_build.log 2>&1
+tail -3 ~/uav_guided_ugv/setup/logs/px4_ros_ws_build.log
 find install -name MicroXRCEAgent
 ```
 Expect: `Summary: 2 packages finished`; MicroXRCEAgent found.
@@ -209,8 +209,8 @@ grep -n '_fastdds_tag' CMakeLists.txt
 sed -i 's/set(_fastdds_tag 2.12.x)/set(_fastdds_tag v2.12.1)/' CMakeLists.txt
 grep -n '_fastdds_tag' CMakeLists.txt
 cd ~/px4_ros_ws
-colcon build > ~/drdo_setup/logs/px4_ros_ws_build2.log 2>&1
-tail -3 ~/drdo_setup/logs/px4_ros_ws_build2.log
+colcon build > ~/uav_guided_ugv/setup/logs/px4_ros_ws_build2.log 2>&1
+tail -3 ~/uav_guided_ugv/setup/logs/px4_ros_ws_build2.log
 ```
 Expect: second grep shows `v2.12.1`; 2 packages finished.
 Stop if: first grep is empty.
@@ -228,8 +228,8 @@ git rev-parse --short HEAD
 rosdep update
 rosdep install --from-paths src --ignore-src -y --simulate --skip-keys "ros_gz_sim ros_gz_bridge ros_gz_image ros_gz_interfaces"
 rosdep install --from-paths src --ignore-src -y --skip-keys "ros_gz_sim ros_gz_bridge ros_gz_image ros_gz_interfaces"
-colcon build --packages-select drdo_gz_worlds ackermann_gz_bringup > ~/drdo_setup/logs/tp_build.log 2>&1
-tail -3 ~/drdo_setup/logs/tp_build.log
+colcon build --packages-select drdo_gz_worlds ackermann_gz_bringup > ~/uav_guided_ugv/setup/logs/tp_build.log 2>&1
+tail -3 ~/uav_guided_ugv/setup/logs/tp_build.log
 ls install/drdo_gz_worlds/share/drdo_gz_worlds/worlds
 ```
 Expect: Summary: 2 packages finished; 5 world files listed.
@@ -241,15 +241,15 @@ Goal: Create the shared environment file.
 Inputs: none
 Run:
 ```bash
-mkdir -p ~/drdo_setup/logs ~/drdo_setup/reports
-cat > ~/drdo_setup/env.sh <<'EOF'
+mkdir -p ~/uav_guided_ugv/setup/logs ~/uav_guided_ugv/setup/reports
+cat > ~/uav_guided_ugv/setup/env.sh <<'EOF'
 source /opt/ros/humble/setup.bash
 source ~/px4_ros_ws/install/setup.bash
 source ~/training_pool/install/setup.bash
-[ -f ~/drdo_ws/install/setup.bash ] && source ~/drdo_ws/install/setup.bash
+[ -f ~/uav_guided_ugv/ws/install/setup.bash ] && source ~/uav_guided_ugv/ws/install/setup.bash
 export GZ_SIM_RESOURCE_PATH=$HOME/PX4-Autopilot/Tools/simulation/gz/models:$HOME/PX4-Autopilot/Tools/simulation/gz/worlds:$HOME/training_pool/install/drdo_gz_worlds/share/drdo_gz_worlds/models:${GZ_SIM_RESOURCE_PATH:-}
 EOF
-bash -c 'source ~/drdo_setup/env.sh && ros2 pkg prefix drdo_gz_worlds && ros2 pkg prefix px4_msgs'
+bash -c 'source ~/uav_guided_ugv/setup/env.sh && ros2 pkg prefix drdo_gz_worlds && ros2 pkg prefix px4_msgs'
 ```
 Expect: two install prefixes.
 Stop if: `ros2 pkg prefix` errors.
@@ -260,11 +260,11 @@ Goal: Kill old sim processes, launch a world in background.
 Inputs: {{WORLD}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 pkill -f 'gz sim' ; pkill -f px4_sitl_default/bin/px4 ; pkill -f MicroXRCEAgent ; pkill -f parameter_bridge ; sleep 3
-nohup ros2 launch drdo_gz_worlds world.launch.py world:={{WORLD}} > ~/drdo_setup/logs/gz_{{WORLD}}.log 2>&1 &
+nohup ros2 launch drdo_gz_worlds world.launch.py world:={{WORLD}} > ~/uav_guided_ugv/setup/logs/gz_{{WORLD}}.log 2>&1 &
 sleep 40
-grep -i 'scale' ~/drdo_setup/logs/gz_{{WORLD}}.log | head -3
+grep -i 'scale' ~/uav_guided_ugv/setup/logs/gz_{{WORLD}}.log | head -3
 gz topic -l | grep -c '/world/{{WORLD}}/'
 ```
 Expect: topic count > 0; Gazebo window open.
@@ -276,9 +276,9 @@ Goal: Spawn the rover, sample /odom z.
 Inputs: {{WORLD}} {{UGV_X}} {{UGV_Y}} {{UGV_Z}} {{UGV_YAW}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 pkill -f spawn_ackermann ; sleep 1
-nohup ros2 launch ackermann_gz_bringup spawn_ackermann.launch.py world:={{WORLD}} x:={{UGV_X}} y:={{UGV_Y}} z:={{UGV_Z}} yaw:={{UGV_YAW}} > ~/drdo_setup/logs/rover_{{WORLD}}.log 2>&1 &
+nohup ros2 launch ackermann_gz_bringup spawn_ackermann.launch.py world:={{WORLD}} x:={{UGV_X}} y:={{UGV_Y}} z:={{UGV_Z}} yaw:={{UGV_YAW}} > ~/uav_guided_ugv/setup/logs/rover_{{WORLD}}.log 2>&1 &
 sleep 10
 timeout 3 ros2 topic echo /odom --field pose.pose.position.z | head -1
 sleep 5
@@ -293,7 +293,7 @@ Goal: Drive the rover forward for 5 s via /cmd_vel.
 Inputs: none
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 timeout 3 ros2 topic echo /odom --field pose.pose.position | head -3
 timeout 5 ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 1.0}}"
 timeout 3 ros2 topic echo /odom --field pose.pose.position | head -3
@@ -307,12 +307,12 @@ Goal: Spawn PX4 UAV into the running world.
 Inputs: {{WORLD}} {{UAV_MODEL}} {{UAV_POSE}} (x,y,z,roll,pitch,yaw comma-separated)
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 pkill -f px4_sitl_default/bin/px4 ; sleep 2
 cd ~/PX4-Autopilot
-PX4_GZ_STANDALONE=1 PX4_SIM_MODEL={{UAV_MODEL}} PX4_GZ_WORLD={{WORLD}} PX4_GZ_MODEL_POSE="{{UAV_POSE}}" nohup ./build/px4_sitl_default/bin/px4 -d > ~/drdo_setup/logs/px4_{{WORLD}}.log 2>&1 &
+PX4_GZ_STANDALONE=1 PX4_SIM_MODEL={{UAV_MODEL}} PX4_GZ_WORLD={{WORLD}} PX4_GZ_MODEL_POSE="{{UAV_POSE}}" nohup ./build/px4_sitl_default/bin/px4 -d > ~/uav_guided_ugv/setup/logs/px4_{{WORLD}}.log 2>&1 &
 sleep 45
-grep -c 'Ready for takeoff' ~/drdo_setup/logs/px4_{{WORLD}}.log
+grep -c 'Ready for takeoff' ~/uav_guided_ugv/setup/logs/px4_{{WORLD}}.log
 gz model --list | grep -i x500
 ```
 Expect: count >= 1; model listed as `{{UAV_MODEL}}_0` (no gz_ prefix).
@@ -324,11 +324,11 @@ Goal: Start the XRCE agent, count /fmu topics.
 Inputs: none
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 pkill -f MicroXRCEAgent ; sleep 1
-nohup MicroXRCEAgent udp4 -p 8888 > ~/drdo_setup/logs/agent.log 2>&1 &
+nohup MicroXRCEAgent udp4 -p 8888 > ~/uav_guided_ugv/setup/logs/agent.log 2>&1 &
 sleep 15
-grep -c -i 'session established' ~/drdo_setup/logs/agent.log
+grep -c -i 'session established' ~/uav_guided_ugv/setup/logs/agent.log
 ros2 topic list | grep -c /fmu/
 ros2 topic list | grep vehicle_local_position
 ```
@@ -343,7 +343,7 @@ Run:
 ```bash
 ~/PX4-Autopilot/build/px4_sitl_default/bin/px4-commander takeoff
 sleep 20
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 timeout 3 ros2 topic echo {{LOCAL_POSITION_TOPIC}} --field z | head -1
 ```
 Expect: z about -2.5 (NED, negative = above start).
@@ -355,7 +355,7 @@ Goal: List Gazebo camera topics of the spawned UAV.
 Inputs: none
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 gz topic -l | grep -i -E 'image|depth|camera_info|points'
 ```
 Expect: lines like `/world/<w>/model/<m>/link/camera_link/sensor/<s>/image`.
@@ -367,9 +367,9 @@ Goal: Bridge four camera topics; view RGB.
 Inputs: {{RGB_TOPIC}} {{DEPTH_TOPIC}} {{INFO_TOPIC}} {{POINTS_TOPIC}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 pkill -f parameter_bridge ; sleep 1
-nohup ros2 run ros_gz_bridge parameter_bridge {{RGB_TOPIC}}@sensor_msgs/msg/Image@gz.msgs.Image {{DEPTH_TOPIC}}@sensor_msgs/msg/Image@gz.msgs.Image {{INFO_TOPIC}}@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo {{POINTS_TOPIC}}@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked > ~/drdo_setup/logs/bridge.log 2>&1 &
+nohup ros2 run ros_gz_bridge parameter_bridge {{RGB_TOPIC}}@sensor_msgs/msg/Image@gz.msgs.Image {{DEPTH_TOPIC}}@sensor_msgs/msg/Image@gz.msgs.Image {{INFO_TOPIC}}@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo {{POINTS_TOPIC}}@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked > ~/uav_guided_ugv/setup/logs/bridge.log 2>&1 &
 sleep 5
 timeout 8 ros2 topic hz {{RGB_TOPIC}}
 nohup ros2 run rqt_image_view rqt_image_view {{RGB_TOPIC}} > /dev/null 2>&1 &
@@ -402,7 +402,7 @@ grep -c '<box>' src/drdo_gz_worlds/models/world*/model.sdf
 grep '<collision' src/drdo_gz_worlds/models/world3/model.sdf
 git add -A
 git commit -m "B1: terrain collision uses the visual mesh"
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 colcon build --packages-select drdo_gz_worlds
 ```
 Expect: 5 True; box counts 0; build finished.
@@ -414,7 +414,7 @@ Goal: Read real-time factor of the running world.
 Inputs: {{WORLD}}
 Run:
 ```bash
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 timeout 6 gz topic -e -t /world/{{WORLD}}/stats | grep real_time_factor | tail -2
 ```
 Expect: two `real_time_factor: <number>` lines.
@@ -435,7 +435,7 @@ grep -n 'terrain_raster3' world3/model.sdf
 cd ~/training_pool
 git add -A
 git commit -m "B1: decimated collision mesh for world3"
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 colcon build --packages-select drdo_gz_worlds
 ```
 Expect: new .dae well under 40 MB; first grep hit ends `_collision.dae`.
@@ -453,7 +453,7 @@ sed -i '/<scale>0.000001 0.000001 0.000001<\/scale>/d' src/drdo_gz_worlds/worlds
 grep -c '0.000001' src/drdo_gz_worlds/worlds/*.sdf
 git add -A
 git commit -m "B4a: drop 1e-6 include scale"
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 colcon build --packages-select drdo_gz_worlds
 ```
 Expect: first grep >= 5 lines; second all 0; build finished.
@@ -514,7 +514,7 @@ grep -n 'world3' worlds/drdo_world3_overlay.sdf
 cd ~/training_pool
 git add -A
 git commit -m "B2: world3_mesh model and drdo_world3_overlay world"
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 colcon build --packages-select drdo_gz_worlds
 ls install/drdo_gz_worlds/share/drdo_gz_worlds/worlds install/drdo_gz_worlds/share/drdo_gz_worlds/models
 ```
@@ -547,8 +547,8 @@ sed 's/x500_depth/x500_depth_down/g' 4002_gz_x500_depth > 4022_gz_x500_depth_dow
 sed -i '/4021_gz_x500_flow/a 4022_gz_x500_depth_down' CMakeLists.txt
 grep -n -A1 '4021_gz_x500_flow' CMakeLists.txt
 cd ~/PX4-Autopilot
-make px4_sitl > ~/drdo_setup/logs/px4_build_b3.log 2>&1
-tail -3 ~/drdo_setup/logs/px4_build_b3.log
+make px4_sitl > ~/uav_guided_ugv/setup/logs/px4_build_b3.log 2>&1
+tail -3 ~/uav_guided_ugv/setup/logs/px4_build_b3.log
 ls build/px4_sitl_default/etc/init.d-posix/airframes | grep 4022
 git add ROMFS Tools/simulation/gz
 git commit -m "B3: gz_x500_depth_down airframe 4022"
@@ -593,10 +593,10 @@ Goal: Write the one-command bring-up script.
 Inputs: {{RGB_SUFFIX}} {{DEPTH_SUFFIX}} {{INFO_SUFFIX}} {{POINTS_SUFFIX}} (topic part after `/world/<world>/`)
 Run:
 ```bash
-cat > ~/drdo_setup/bringup.sh <<'EOF'
+cat > ~/uav_guided_ugv/setup/bringup.sh <<'EOF'
 #!/usr/bin/env bash
 W=${1:?world}; M=${2:-gz_x500_depth_down}
-source ~/drdo_setup/env.sh
+source ~/uav_guided_ugv/setup/env.sh
 case ${W%_overlay} in
   drdo_world1) UAV="-10.226,311.831,22.863,0.011338,0.135709,-2.161422"; UGV="-12.220319 308.976703 22.295580 -2.161422";;
   drdo_world2) UAV="103.776917,-101.472992,17.318562,-0.054656,0.032451,2.460081"; UGV="104.742386 -101.9010777 15.730011 2.460081";;
@@ -604,7 +604,7 @@ case ${W%_overlay} in
   *) echo "unknown world $W"; exit 1;;
 esac
 set -- $UGV
-L=~/drdo_setup/logs; mkdir -p $L
+L=~/uav_guided_ugv/setup/logs; mkdir -p $L
 pkill -f 'gz sim'; pkill -f px4_sitl_default/bin/px4; pkill -f MicroXRCEAgent; pkill -f parameter_bridge; sleep 3
 nohup ros2 launch drdo_gz_worlds world.launch.py world:=$W > $L/gz.log 2>&1 &
 sleep 30
@@ -616,8 +616,8 @@ sleep 40
 P=/world/$W
 nohup ros2 run ros_gz_bridge parameter_bridge $P/{{RGB_SUFFIX}}@sensor_msgs/msg/Image@gz.msgs.Image $P/{{DEPTH_SUFFIX}}@sensor_msgs/msg/Image@gz.msgs.Image $P/{{INFO_SUFFIX}}@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo $P/{{POINTS_SUFFIX}}@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked --ros-args -r $P/{{RGB_SUFFIX}}:=/uav/rgb -r $P/{{DEPTH_SUFFIX}}:=/uav/depth -r $P/{{INFO_SUFFIX}}:=/uav/camera_info -r $P/{{POINTS_SUFFIX}}:=/uav/points > $L/bridge.log 2>&1 &
 EOF
-chmod +x ~/drdo_setup/bringup.sh
-bash -n ~/drdo_setup/bringup.sh && echo SYNTAX_OK
+chmod +x ~/uav_guided_ugv/setup/bringup.sh
+bash -n ~/uav_guided_ugv/setup/bringup.sh && echo SYNTAX_OK
 ```
 Expect: SYNTAX_OK.
 Stop if: bash -n reports an error.
@@ -628,10 +628,10 @@ Goal: Run bringup.sh from a clean shell; check five signals.
 Inputs: none
 Run:
 ```bash
-env -u ROS_DISTRO -u AMENT_PREFIX_PATH -u GZ_SIM_RESOURCE_PATH -u COLCON_PREFIX_PATH bash --norc -c '~/drdo_setup/bringup.sh drdo_world2'
-source ~/drdo_setup/env.sh
-grep -c 'Ready for takeoff' ~/drdo_setup/logs/px4.log
-grep -c -i 'session established' ~/drdo_setup/logs/agent.log
+env -u ROS_DISTRO -u AMENT_PREFIX_PATH -u GZ_SIM_RESOURCE_PATH -u COLCON_PREFIX_PATH bash --norc -c '~/uav_guided_ugv/setup/bringup.sh drdo_world2'
+source ~/uav_guided_ugv/setup/env.sh
+grep -c 'Ready for takeoff' ~/uav_guided_ugv/setup/logs/px4.log
+grep -c -i 'session established' ~/uav_guided_ugv/setup/logs/agent.log
 timeout 3 ros2 topic echo /odom --field pose.pose.position.z | head -1
 timeout 8 ros2 topic hz /uav/rgb
 ros2 topic list | grep -c /fmu/
@@ -645,10 +645,10 @@ Goal: Append text to the setup report.
 Inputs: {{TEXT}}
 Run:
 ```bash
-cat >> ~/drdo_setup/reports/02_setup_report.md <<'EOF'
+cat >> ~/uav_guided_ugv/setup/reports/02_setup_report.md <<'EOF'
 {{TEXT}}
 EOF
-tail -3 ~/drdo_setup/reports/02_setup_report.md
+tail -3 ~/uav_guided_ugv/setup/reports/02_setup_report.md
 ```
 Expect: appended text echoed.
 Stop if: nothing.

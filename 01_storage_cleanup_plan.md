@@ -1,6 +1,6 @@
 # Plan 1: Storage cleanup and system inventory
 Purpose: inventory; free >= 20 GB (floor 15) without harming ROS 2 Humble, dual-boot, user data.
-Inputs: none. Outputs: ~/drdo_setup/reports/01_storage_report.md, STATE.md.
+Inputs: none. Outputs: ~/uav_guided_ugv/setup/reports/01_storage_report.md, STATE.md.
 Orchestrator turn budget: none on Gemini CLI (1,500 requests/day); 8 if on a 50/day orchestrator. Dispatch one card at a time.
 
 ## Orchestrator
@@ -10,7 +10,7 @@ Rules
 3. FAILED/BLOCKED/NEEDS_USER: show the user the raw block, ask; re-dispatch only after the user's fix.
 4. Tier-2 (T8-T13) only after the user's yes per card; batch the questions using the N6 text.
 5. apt cards T5 T9 T10: one per turn, never together (dpkg lock).
-6. Never DISTRO=humble; WS_PATH never ~, ~/training_pool, ~/px4_ros_ws, ~/drdo_ws, ~/PX4-Autopilot, ~/ardupilot* or under /opt.
+6. Never DISTRO=humble; WS_PATH never ~, ~/training_pool, ~/px4_ros_ws, ~/uav_guided_ugv/ws, ~/PX4-Autopilot, ~/ardupilot* or under /opt.
 7. Never resize/move partitions or delete /swapfile. Fortress ros-humble-ros-gz*: notes only, never a candidate.
 8. By turn 8 dispatch T14 regardless.
 
@@ -268,11 +268,11 @@ Goal: write the storage report file.
 Inputs: {{REPORT}} (filled report template)
 Run:
 ~~~bash
-mkdir -p ~/drdo_setup/reports
-cat > ~/drdo_setup/reports/01_storage_report.md << 'EOF'
+mkdir -p ~/uav_guided_ugv/setup/reports
+cat > ~/uav_guided_ugv/setup/reports/01_storage_report.md << 'EOF'
 {{REPORT}}
 EOF
-grep -c '' ~/drdo_setup/reports/01_storage_report.md
+grep -c '' ~/uav_guided_ugv/setup/reports/01_storage_report.md
 ~~~
 Expect: line count above 20.
 Stop if: cat errors.
