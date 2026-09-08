@@ -330,10 +330,11 @@ class TerrainMapper(Node):
         self.pub_map.publish(self._to_grid_msg(out['occ'], out['box']))
         self.pub_stats.publish(String(data=json.dumps(out['info'])))
         if out['info']['multi_level_cells'] > 0:
+            gap = float(self.p['multi_level_gap_m'])
             self._throttle_warn(
-                f"{out['info']['multi_level_cells']} road cells stack two levels "
-                '>%.1f m apart -- run height_slicer for the Nav2 stage'
-                % float(self.p['multi_level_gap_m']))
+                f"{out['info']['multi_level_cells']} road cells stack two "
+                f'levels more than {gap:.1f} m apart -- run height_slicer '
+                'for the Nav2 stage')
         if self.pub_elev is not None:
             self.pub_elev.publish(self._to_image_msg(out['elev']))
 
