@@ -1,0 +1,24 @@
+# colcon
+build/
+install/
+log/
+
+# survey products
+maps/
+bags/
+*.npz
+*.pgm
+!docs/**/*.png
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# editors / os
+.vscode/
+.idea/
+*.swp
+.DS_Store
+desktop.ini

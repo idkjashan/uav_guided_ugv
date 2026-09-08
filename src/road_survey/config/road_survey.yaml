@@ -1,0 +1,67 @@
+# Defaults for the manual road survey.  Start here, then tune the four
+# thresholds under "road classification" offline with `tune_offline`.
+terrain_mapper:
+  ros__parameters:
+    use_sim_time: true
+
+    # --- inputs ------------------------------------------------------------
+    depth_topic: /uav/depth
+    camera_info_topic: /uav/depth_camera_info   # '' to force the hfov fallback
+    position_topic: /fmu/out/vehicle_local_position
+    attitude_topic: /fmu/out/vehicle_attitude
+    map_frame: map
+
+    # StereoOV7251 on the OakD-Lite, used only if camera_info never arrives.
+    depth_width: 640
+    depth_height: 480
+    depth_hfov_rad: 1.274
+    # camera_link <pose> inside x500_depth_down/model.sdf: x y z roll pitch yaw
+    cam_pose_in_body: [0.12, 0.03, 0.242, 0.0, 1.5708, 0.0]
+    # The sensor's own clip is 0.2 .. 19.1 m.  Stay inside it: anything above
+    # ~18 m AGL simply returns nothing.
+    depth_min_m: 0.4
+    depth_max_m: 18.0
+    stride: 2            # use every 2nd pixel -> 76k points per frame
+
+    # --- grid --------------------------------------------------------------
+    resolution: 0.25     # metres per cell
+    map_size_m: 400.0    # square, centred on the first UAV pose
+    auto_center: true
+    center_x: 0.0
+    center_y: 0.0
+    track_extrema: true  # needed for multi-level (switchback) detection
+    multi_level_gap_m: 2.0
+
+    # --- which frames get integrated ---------------------------------------
+    max_integrate_hz: 5.0
+    min_translation_m: 0.25   # ignore frames taken while hovering in place
+    min_rotation_deg: 3.0
+    max_pose_dt_s: 0.08       # reject a frame if no pose within 80 ms
+    max_tilt_deg: 25.0        # reject frames taken while banking hard
+    min_count: 3              # samples needed before a cell counts as known
+
+    # --- road classification (the knobs that matter) ------------------------
+    classify_period_s: 2.0
+    window_cells: 5           # 1.25 m plane-fit window at 0.25 m resolution
+    smooth_cells: 3
+    slope_crit_deg: 15.0      # above this the cell cannot be road
+    step_crit_m: 0.25         # vertical jump inside a 3x3 that rules out road
+    rough_crit_m: 0.12        # RMS residual about the local plane
+    risk_thresh: 0.35         # cells with risk below this are road
+
+    # --- costmap shaping ----------------------------------------------------
+    open_radius_m: 0.4
+    close_radius_m: 0.8
+    min_area_m2: 25.0
+    keep_components: 1        # keep only the largest road blob
+    edge_cost_ref_m: 1.5      # cost falls 99 -> 0 over this distance from the edge
+    unknown_is_lethal: true
+    seed_at_start_pose: true  # always keep the blob under the UAV spawn
+
+    # --- output -------------------------------------------------------------
+    costmap_topic: /road/costmap
+    publish_elevation_image: false
+    output_dir: ~/uav_guided_ugv/maps
+    output_name: road_map
+    save_centerline: true
+    autosave_on_shutdown: true
