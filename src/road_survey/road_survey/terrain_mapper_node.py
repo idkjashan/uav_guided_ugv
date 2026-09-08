@@ -23,6 +23,7 @@ from collections import deque
 
 import numpy as np
 import rclpy
+from geometry_msgs.msg import PoseStamped, TransformStamped
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
@@ -30,12 +31,13 @@ from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
+from tf2_ros import TransformBroadcaster
 
 from . import costmap as cm
 from . import mapio
 from . import risk as rk
 from .depth import Unprojector, decode_image, intrinsics_from_hfov, k_from_camera_info
-from .frames import camera_extrinsics, optical_to_map, px4_pose_to_map, yaw_from_rot
+from .frames import camera_extrinsics, optical_to_map, px4_pose_to_map, rot_to_quat, yaw_from_rot
 from .grid import TerrainGrid, known_bbox
 
 PX4_QOS = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -156,6 +158,8 @@ class TerrainMapper(Node):
         self.pub_map = self.create_publisher(OccupancyGrid,
                                              self.p['costmap_topic'], LATCHED)
         self.pub_stats = self.create_publisher(String, '/road/stats', 10)
+        self.pub_uav_pose = self.create_publisher(PoseStamped, '/uav/pose', 10)
+        self.tf_broadcaster = TransformBroadcaster(self)
         self.pub_elev = None
         if self.p['publish_elevation_image']:
             self.pub_elev = self.create_publisher(Image, '/terrain/elevation', 1)
@@ -183,15 +187,52 @@ class TerrainMapper(Node):
                 'before running this node.') from exc
         self.create_subscription(VehicleLocalPosition, self.p['position_topic'],
                                  self.on_position, PX4_QOS)
+        if self.p['position_topic'] == '/fmu/out/vehicle_local_position':
+            self.create_subscription(VehicleLocalPosition,
+                                     '/fmu/out/vehicle_local_position_v1',
+                                     self.on_position, PX4_QOS)
         self.create_subscription(VehicleAttitude, self.p['attitude_topic'],
                                  self.on_attitude, PX4_QOS)
 
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
 
+    def _publish_uav_pose(self, p_map, r_map_body, stamp=None):
+        q = rot_to_quat(r_map_body)
+        pose = PoseStamped()
+        pose.header.stamp = stamp or self.get_clock().now().to_msg()
+        pose.header.frame_id = self.p['map_frame']
+        pose.pose.position.x = float(p_map[0])
+        pose.pose.position.y = float(p_map[1])
+        pose.pose.position.z = float(p_map[2])
+        pose.pose.orientation.w = float(q[0])
+        pose.pose.orientation.x = float(q[1])
+        pose.pose.orientation.y = float(q[2])
+        pose.pose.orientation.z = float(q[3])
+        self.pub_uav_pose.publish(pose)
+
+        t = TransformStamped()
+        t.header.stamp = pose.header.stamp
+        t.header.frame_id = self.p['map_frame']
+        t.child_frame_id = 'uav_base_link'
+        t.transform.translation.x = float(p_map[0])
+        t.transform.translation.y = float(p_map[1])
+        t.transform.translation.z = float(p_map[2])
+        t.transform.rotation.w = float(q[0])
+        t.transform.rotation.x = float(q[1])
+        t.transform.rotation.y = float(q[2])
+        t.transform.rotation.z = float(q[3])
+        self.tf_broadcaster.sendTransform(t)
+
     def on_position(self, msg):
         if msg.xy_valid and msg.z_valid:
-            self.pos_buf.append((self._now(), np.array([msg.x, msg.y, msg.z])))
+            now = self._now()
+            pos_ned = np.array([msg.x, msg.y, msg.z])
+            self.pos_buf.append((now, pos_ned))
+            quat, dt_a = self._nearest(self.att_buf, now)
+            if quat is not None and dt_a < 0.2:
+                p_map, r_map_body = px4_pose_to_map(pos_ned, quat)
+                self._publish_uav_pose(p_map, r_map_body)
 
     def on_attitude(self, msg):
         self.att_buf.append((self._now(), np.asarray(msg.q, dtype=float)))
@@ -231,6 +272,7 @@ class TerrainMapper(Node):
             return
 
         p_map, r_map_body = px4_pose_to_map(pos_ned, quat)
+        self._publish_uav_pose(p_map, r_map_body, msg.header.stamp)
         tilt = math.degrees(math.acos(max(-1.0, min(1.0, r_map_body[2, 2]))))
         if tilt > float(self.p['max_tilt_deg']):
             return

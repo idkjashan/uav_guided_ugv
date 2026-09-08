@@ -1,0 +1,25 @@
+<?xml version='1.0'?>
+<sdf version='1.6'>
+  <model name='terrain'>
+    <static>1</static>
+    <link name='link'>
+      <collision name='collision'>
+        <geometry>
+          <mesh>
+            <scale>20 20 20</scale>
+            <uri>model://world3_mesh/meshes/terrain_raster3.dae</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='visual'>
+        <cast_shadows>0</cast_shadows>
+        <geometry>
+          <mesh>
+            <scale>20 20 20</scale>
+            <uri>model://world3_mesh/meshes/terrain_raster3.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

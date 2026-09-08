@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>drdo_gz_worlds</name>
+  <version>0.1.0</version>
+  <description>
+    Gazebo Harmonic (gz-sim) worlds and terrain models for the DRDO
+    UAV-Guided UGV Navigation challenge, ported from the original
+    ROS1 Noetic / Gazebo Classic 11 package (interiit22/world,
+    interiit22/models). UAV and UGV are spawned as separate models
+    into these worlds; they are not embedded here.
+  </description>
+  <maintainer email="you@example.com">your_name</maintainer>
+  <license>TODO</license>
+
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
