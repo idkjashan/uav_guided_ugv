@@ -4,7 +4,7 @@ project(ackermann_gz_bringup)
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY launch models
+  DIRECTORY launch models urdf
   DESTINATION share/${PROJECT_NAME}
 )
 

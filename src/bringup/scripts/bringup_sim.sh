@@ -4,12 +4,12 @@
 # PX4 SITL UAV (downward-facing camera), MicroXRCEAgent, and ROS-GZ bridges.
 #
 # Usage:
-#   ./scripts/bringup_sim.sh [world_name] [uav_model]
+#   ./bringup_sim.sh [world_name] [uav_model]
 #
 # Examples:
-#   ./scripts/bringup_sim.sh drdo_world2
-#   ./scripts/bringup_sim.sh drdo_world1
-#   ./scripts/bringup_sim.sh drdo_world3_overlay
+#   ./bringup_sim.sh drdo_world2
+#   ./bringup_sim.sh drdo_world1
+#   ./bringup_sim.sh drdo_world3_overlay
 #
 
 WORLD=${1:-drdo_world2}
@@ -21,7 +21,7 @@ elif [ -d "/home/jashan/PX4-Autopilot" ]; then
 elif [ -d "$HOME/PX4-Autopilot" ]; then
   PX4_DIR="$HOME/PX4-Autopilot"
 fi
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 LOG_DIR="$REPO_DIR/log/sim_bringup"
 mkdir -p "$LOG_DIR"
 
@@ -41,7 +41,7 @@ fi
 
 # Resource paths for Gazebo Harmonic
 export GZ_PARTITION="${GZ_PARTITION:-uav_ugv}"
-export GZ_SIM_RESOURCE_PATH="$PX4_DIR/Tools/simulation/gz/models:$PX4_DIR/Tools/simulation/gz/worlds:$REPO_DIR/install/drdo_gz_worlds/share/drdo_gz_worlds/models:$REPO_DIR/install/ackermann_gz_bringup/share/ackermann_gz_bringup/models:${GZ_SIM_RESOURCE_PATH:-}"
+export GZ_SIM_RESOURCE_PATH="$PX4_DIR/Tools/simulation/gz/models:$PX4_DIR/Tools/simulation/gz/worlds:$REPO_DIR/install/drdo_gz_worlds/share/drdo_gz_worlds/models:$REPO_DIR/install/ackermann_gz_bringup/share/ackermann_gz_bringup/models:$REPO_DIR/install/bringup/share/bringup/urdf:${GZ_SIM_RESOURCE_PATH:-}"
 
 # World-specific terrain spawn offsets
 case ${WORLD%_overlay} in
@@ -71,10 +71,17 @@ echo "============================================================"
 
 # Kill previous instances if requested or clean stale processes of this simulation
 echo "[0/5] Cleaning up existing simulation processes for $WORLD..."
+if [ -f "$LOG_DIR/px4.pid" ]; then
+  kill -TERM "$(cat "$LOG_DIR/px4.pid")" 2>/dev/null || true
+  rm -f "$LOG_DIR/px4.pid"
+fi
 pkill -f "world.launch.py.*world:=$WORLD" 2>/dev/null || true
 pkill -f "spawn_ackermann.launch.py.*world:=$WORLD" 2>/dev/null || true
 pkill -f "uav_bridge.launch.py.*world:=$WORLD" 2>/dev/null || true
 pkill -f "PX4_GZ_WORLD=$WORLD" 2>/dev/null || true
+if [ -f /tmp/px4_lock-0 ] && ! fuser /tmp/px4_lock-0 >/dev/null 2>&1; then
+  rm -f /tmp/px4_lock-0
+fi
 sleep 1
 
 # 1. Launch Gazebo Harmonic world
@@ -110,6 +117,7 @@ if [ -d "$PX4_DIR" ]; then
     cd "$PX4_DIR/build/px4_sitl_default/rootfs"
     PX4_GZ_STANDALONE=1 PX4_SIM_MODEL="$UAV_MODEL" PX4_GZ_WORLD="$WORLD" PX4_GZ_MODEL_POSE="$UAV_POSE" \
       nohup setsid ../bin/px4 -d </dev/null > "$LOG_DIR/px4.log" 2>&1 &
+    echo $! > "$LOG_DIR/px4.pid"
     disown
   )
   sleep 12

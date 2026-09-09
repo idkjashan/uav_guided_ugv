@@ -8,6 +8,7 @@ install(DIRECTORY
   models
   launch
   px4_airframes
+  urdf
   DESTINATION share/${PROJECT_NAME}
 )
 

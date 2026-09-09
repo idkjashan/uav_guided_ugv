@@ -49,12 +49,12 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(use_bridge),
         arguments=[
             '/depth_camera@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/depth_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
             f'{clock_topic}@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
         ],
         remappings=[
             ('/depth_camera', '/uav/depth'),
-            ('/depth_camera/camera_info', '/uav/depth_camera_info'),
+            ('/camera_info', '/uav/depth_camera_info'),
             (clock_topic, '/clock'),
         ],
         output='screen',

@@ -41,9 +41,9 @@ from .frames import camera_extrinsics, optical_to_map, px4_pose_to_map, rot_to_q
 from .grid import TerrainGrid, known_bbox
 
 PX4_QOS = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
-                     durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                     durability=DurabilityPolicy.VOLATILE,
                      history=HistoryPolicy.KEEP_LAST,
-                     depth=1)
+                     depth=10)
 
 LATCHED = QoSProfile(reliability=ReliabilityPolicy.RELIABLE,
                      durability=DurabilityPolicy.TRANSIENT_LOCAL,

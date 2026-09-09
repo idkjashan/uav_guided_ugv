@@ -6,7 +6,7 @@ set -e
 # model and airframe inside PX4-Autopilot for DRDO terrain world simulations.
 
 PX4_DIR="${PX4_AUTOPILOT_DIR:-$HOME/PX4-Autopilot}"
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo "============================================================"
 echo " Setting up UAV Downward-Camera (x500_depth_down) for PX4   "
@@ -51,7 +51,7 @@ fi
 
 # 4. Build PX4 SITL target
 if [ "$1" != "--no-build" ] && [ "$1" != "-n" ]; then
-  echo "[4/4] Building PX4 SITL default target (this may take a minute)..."
+  echo "[4/4] Building PX4 SITL default target..."
   cd "$PX4_DIR"
   make px4_sitl_default
 else
@@ -59,8 +59,5 @@ else
 fi
 
 echo "============================================================"
-echo " Setup complete! You can now launch the UAV with:           "
-echo " PX4_GZ_STANDALONE=1 PX4_SIM_MODEL=gz_x500_depth_down \\    "
-echo "   PX4_GZ_WORLD=drdo_world2 PX4_GZ_MODEL_POSE=\"...\" \\    "
-echo "   ./build/px4_sitl_default/bin/px4                         "
+echo " Setup complete! UAV is ready for simulation.               "
 echo "============================================================"

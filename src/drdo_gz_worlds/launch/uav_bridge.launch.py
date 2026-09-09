@@ -27,7 +27,7 @@ def launch_setup(context, *args, **kwargs):
     gz_rgb_image = f'/world/{world}/model/{model_name}/link/camera_link/sensor/IMX214/image'
     gz_rgb_info = f'/world/{world}/model/{model_name}/link/camera_link/sensor/IMX214/camera_info'
     gz_depth_image = '/depth_camera'
-    gz_depth_info = '/depth_camera/camera_info'
+    gz_depth_info = '/camera_info'
     gz_depth_points = '/depth_camera/points'
     gz_clock = f'/world/{world}/clock'
 

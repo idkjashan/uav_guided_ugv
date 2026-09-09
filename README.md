@@ -1,82 +1,108 @@
 # uav_guided_ugv
 
-Colcon workspace for the DRDO Inter-IIT "UAV-guided UGV" problem statement.
-ROS 2 Humble · Gazebo Harmonic · PX4 v1.16.
+Colcon workspace for the DRDO Inter-IIT "UAV-guided UGV" problem statement.  
+ROS 2 Humble · Gazebo Harmonic · PX4 Autopilot v1.16.
 
-The UGV carries no sensors. The UAV surveys the road from the air, builds a
-costmap, and the rover is then navigated along it.
+The UGV carries no sensors. The UAV surveys the road from the air with a downward-facing depth camera, builds a 2.5-D traversability costmap, and guides the UGV along the traversable route.
 
 ```
 uav_guided_ugv/
-├── src/road_survey/        stage 1 — road detection and costmap  (implemented)
+├── src/
+│   ├── bringup/                # System bringup, orchestration launch files, URDFs, mission nodes
+│   ├── road_survey/            # Stage 1: Road detection, 2.5-D elevation accumulation, costmap
+│   ├── drdo_gz_worlds/         # DRDO Gazebo Harmonic worlds, mesh terrains, UAV bridge & models
+│   └── ackermann_gz_bringup/   # UGV Ackermann rover model, SDF/URDF, and ROS-GZ bridges
 ├── docs/
-│   ├── 01_road_survey_plan.md   how road detection works and why
-│   ├── HANDOFF.md               integration notes: read before wiring it up
-│   └── SYSTEM_ENVIRONMENT.md    the exact machine, versions and topics
-└── scripts/record_survey.sh     bag the topics needed to replay a survey
+│   ├── 01_road_survey_plan.md  # How road detection works and theoretical rationale
+│   ├── HANDOFF.md              # Integration notes and cross-package workflows
+│   └── SYSTEM_ENVIRONMENT.md   # Exact machine specifications, versions, and topics
+└── maps/                       # Exported costmaps (.npz, .pgm, .yaml, .png)
 ```
 
-## Stages
+## Packages Overview
 
-| | | |
-|---|---|---|
-| 1 | **Road survey** — fly the UAV manually, accumulate depth into a 2.5-D elevation grid, classify road from slope/step/roughness, publish an OccupancyGrid | implemented, tested offline, **not yet flown** |
-| 2 | **UGV localisation** — ArUco marker on the rover roof, `solvePnP` against the UAV camera, UAV pose from PX4 ⇒ rover pose in the same `map` frame | not started |
-| 3 | **Navigation** — Nav2 on the stage-1 costmap, `/cmd_vel` to the rover | not started |
+1. **`bringup`**:
+   - Master orchestration package.
+   - Contains launch files:
+     - `sim.launch.py`: launches Gazebo world, spawns Ackermann rover, publishes rover URDF TF, starts MicroXRCEAgent, launches PX4 SITL UAV, and starts sensor bridges.
+     - `survey.launch.py`: launches `road_survey`'s `terrain_mapper_node` and RViz.
+     - `survey_mission.launch.py`: autonomous UAV offboard takeoff and survey flight node.
+     - `full_system.launch.py`: 1-command complete system bringup.
+     - `spawn_rover.launch.py`: spawns Ackermann rover with URDF and `robot_state_publisher`.
+     - `rviz.launch.py`: RViz visualization.
+   - Includes standalone URDFs for both the Ackermann rover (`ackermann_bot.urdf`) and quadrotor UAV (`x500_depth_down.urdf`).
 
-## Build and test
+2. **`road_survey`**:
+   - Stage 1 road survey and traversability costmap generator.
+   - Accumulates downward depth returns into a 2.5-D elevation grid.
+   - Evaluates geometry-based risk (slope, step height, surface roughness).
+   - Generates and publishes `/road/costmap` (`nav_msgs/OccupancyGrid`) for Nav2 planning.
+   - Exports lossless `.npz`, Nav2 map server `.pgm`/`.yaml`, and visualization `.png`.
+
+3. **`drdo_gz_worlds`**:
+   - High-fidelity Gazebo Harmonic simulation environments (`drdo_world1`, `drdo_world2`, `drdo_world3`).
+   - Downward-facing OakD-Lite depth/RGB camera UAV model (`x500_depth_down`).
+   - ROS-Gazebo bridge for UAV sensor feeds (`/uav/depth`, `/uav/camera_info`, `/uav/rgb`).
+
+4. **`ackermann_gz_bringup`**:
+   - 4-wheel Ackermann-steered / skid-steer UGV rover model (`ackermann_bot`) equipped with roof-mounted ArUco marker (DICT_4X4_50, ID 0).
+   - URDF and SDF models, ROS-GZ bridges for `/cmd_vel`, `/odom`, `/joint_states`, and `/tf`.
+
+---
+
+## Build & Test
 
 ```bash
 cd ~/uav_guided_ugv
-colcon build --packages-select road_survey --symlink-install
+source /opt/ros/humble/setup.bash
+source ~/px4_ros_ws/install/setup.bash
+colcon build --symlink-install
 source install/setup.bash
 ```
 
-The algorithm modules are pure numpy/scipy/cv2 and need neither ROS nor Gazebo
-to test:
-
+Run unit tests:
 ```bash
-python3 -m pytest src/road_survey/test -q
+PYTHONPATH=src/road_survey python3 -m pytest src/road_survey/test -q
+```
+*(47 passed in ~2s, including synthetic terrain surveys and geometric validation)*.
+
+---
+
+## Running the System
+
+### 1. Unified Simulation Bringup
+```bash
+ros2 launch bringup sim.launch.py world:=drdo_world2 gui:=true
+```
+Supported worlds: `drdo_world1`, `drdo_world2`, `drdo_world3`.
+
+### 2. Start Road Survey Mapping & RViz
+```bash
+ros2 launch bringup survey.launch.py world:=drdo_world2
 ```
 
-47 tests, ~10 s, including an end-to-end simulated survey over a synthetic hill
-road.
-
-## Run a survey
-
-With PX4 SITL, Gazebo and `MicroXRCEAgent` already running:
-
+### 3. Fly the UAV Autonomous Survey Mission
 ```bash
-source ~/px4_ros_ws/install/setup.bash
-ros2 launch road_survey survey.launch.py world:=drdo_world1
+ros2 run bringup survey_mission
+# Or via launch file:
+ros2 launch bringup survey_mission.launch.py altitude:=12.0 forward_dist:=18.0
 ```
 
-Fly the UAV **10–15 m above the road** (the depth sensor's far clip is 19.1 m —
-higher than that and it returns nothing) along the whole route, then:
+### 4. Or Launch Everything in One Command
+```bash
+ros2 launch bringup full_system.launch.py world:=drdo_world2
+```
 
+### 5. Manual Map Save & Replay
+Trigger map save on demand:
 ```bash
 ros2 service call /terrain_mapper/save std_srvs/srv/Trigger
 ```
-
-which writes `~/uav_guided_ugv/maps/road_map.{npz,pgm,yaml,png}`. Open the PNG:
-an unbroken green ribbon with red flanks means it worked.
-
-Tune the thresholds against the saved map instead of re-flying:
-
+Replay saved survey map for the UGV navigation stage:
 ```bash
-ros2 run road_survey tune_offline ~/uav_guided_ugv/maps/road_map.npz \
-    --sweep slope 8 10 12 15 20
+ros2 run road_survey map_publisher --ros-args -p map_npz:=~/uav_guided_ugv/maps/road_map.npz -p use_sim_time:=true
 ```
-
-Republish a saved map for the Nav2 stage:
-
+Sweep classification thresholds offline:
 ```bash
-ros2 run road_survey map_publisher \
-    --ros-args -p map_npz:=~/uav_guided_ugv/maps/road_map.npz -p use_sim_time:=true
+ros2 run road_survey tune_offline ~/uav_guided_ugv/maps/road_map.npz --sweep slope 8 10 12 15 20
 ```
-
-## Dependencies
-
-Everything is in the versions listed in `docs/SYSTEM_ENVIRONMENT.md`, plus
-`px4_msgs` from `~/px4_ros_ws` (source it before running the nodes) and,
-optionally, `python3-skimage` for centre-line extraction.
