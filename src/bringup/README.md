@@ -1,54 +1,37 @@
 # bringup
 
-Unified bringup package for the DRDO UAV-Guided UGV stack.
-
-Contains ROS 2 launch files, URDF robot models, world spawn configurations, autonomous mission nodes, and simulation orchestration utilities.
-
-## Package Structure
+Launch files and world configuration for the DRDO UAV-guided UGV stack. No
+nodes of its own: the mapper lives in `road_survey`, the mission, UGV
+localiser and UGV follower in `guidance`.
 
 ```
 bringup/
 ├── launch/
-│   ├── sim.launch.py            # Complete simulation bringup (Gazebo, Rover, PX4 UAV, bridges, URDF)
-│   ├── full_system.launch.py    # Simulation + road_survey mapper + RViz
-│   ├── survey.launch.py         # Road survey mapping node and RViz visualization
-│   ├── survey_mission.launch.py # Autonomous UAV survey flight & map auto-save
-│   ├── spawn_rover.launch.py    # Spawn Ackermann rover with URDF and robot_state_publisher
-│   └── rviz.launch.py           # RViz visualization
-├── urdf/
-│   ├── ackermann_bot.urdf       # UGV rover URDF (chassis, 4 wheels, ArUco roof marker)
-│   └── x500_depth_down.urdf     # Quadrotor UAV URDF (OakD-Lite downward depth camera)
+│   ├── sim.launch.py        # Gazebo world, UGV, MicroXRCEAgent, PX4 SITL UAV, camera bridge
+│   └── mission.launch.py    # mapper + localiser + follower + mission + RViz
 ├── config/
-│   └── world_poses.yaml         # World spawn coordinates (drdo_world1, drdo_world2, drdo_world3)
-├── bringup/
-│   ├── uav_launcher.py          # Autonomous offboard arm, takeoff, and hover node
-│   └── survey_mission.py        # Autonomous survey flight and real-time map verification
+│   └── world_poses.yaml     # UAV and UGV spawn poses for drdo_world1/2/3
 └── scripts/
-    ├── bringup_sim.sh           # CLI simulation bringup script
-    ├── setup_px4_uav.sh         # PX4 model & airframe installation script
-    └── record_survey.sh         # Rosbag recording utility for offline tuning
+    ├── setup_px4_uav.sh     # install the x500_depth_down model and airframe 4022 into PX4
+    └── record_survey.sh     # record the topics the mapper consumes
 ```
 
-## Quick Start
+## Run
 
-### 1. Launch Complete Simulation
 ```bash
-ros2 launch bringup sim.launch.py world:=drdo_world2 gui:=true
+# terminal 1: simulation (wait for PX4 to print "Ready for takeoff!")
+ros2 launch bringup sim.launch.py world:=drdo_world2
+
+# terminal 2: survey the road, fly back, guide the UGV to the end of it
+ros2 launch bringup mission.launch.py
+
+# or, with a map from an earlier survey in ~/uav_guided_ugv/maps/road_map.npz
+ros2 launch bringup mission.launch.py survey:=false
 ```
 
-### 2. Launch Survey Mapping & Visualization
-```bash
-ros2 launch bringup survey.launch.py world:=drdo_world2
-```
+`sim.launch.py` also publishes a static `world -> map` transform (the UAV
+spawn position). It exists so RViz and `pose_check` can compare the UGV pose
+with Gazebo's ground truth; nothing in the mission uses it.
 
-### 3. Run Autonomous Survey Flight
-```bash
-ros2 run bringup survey_mission
-# Or via launch:
-ros2 launch bringup survey_mission.launch.py altitude:=12.0 forward_dist:=18.0
-```
-
-### 4. Or Launch Everything with One Command
-```bash
-ros2 launch bringup full_system.launch.py world:=drdo_world2
-```
+Spawn poses are read from `config/world_poses.yaml`, keyed by world name
+without the `_overlay` suffix. Add a world there before launching it.

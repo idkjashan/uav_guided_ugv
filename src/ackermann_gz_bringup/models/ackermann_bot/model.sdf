@@ -36,6 +36,32 @@
           <specular>0.2 0.2 0.2 1</specular>
         </material>
       </visual>
+      <!-- ArUco DICT_4X4_50 id 0 on the roof, seen by the UAV's nadir camera.
+           A plane maps the texture straight onto the link axes: image right
+           is +X (forward), image up is +Y. The PNG has a 60 px white border
+           round a 512 px marker, so the black square is 0.55 * 512/632 =
+           0.446 m; that, not 0.55, is the marker length for solvePnP. -->
+      <visual name="aruco_marker">
+        <pose>0 0 0.127 0 0 0</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.55 0.55</size>
+          </plane>
+        </geometry>
+        <material>
+          <ambient>1 1 1 1</ambient>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://ackermann_bot/materials/textures/aruco_marker_0.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>1.0</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
     </link>
 
     <!-- ============================================================= -->
@@ -220,44 +246,6 @@
     </link>
 
     <!-- ============================================================= -->
-    <!-- ArUco marker mounted on the roof (DICT_4X4_50, id 0)           -->
-    <!-- ============================================================= -->
-    <link name="aruco_marker_link">
-      <pose>0 0 0.4475 0 0 0</pose>
-      <inertial>
-        <mass>0.05</mass>
-        <inertia>
-          <ixx>0.0001</ixx>
-          <iyy>0.0001</iyy>
-          <izz>0.0001</izz>
-          <ixy>0</ixy>
-          <ixz>0</ixz>
-          <iyz>0</iyz>
-        </inertia>
-      </inertial>
-      <visual name="aruco_marker_visual">
-        <geometry>
-          <box>
-            <size>0.15 0.15 0.005</size>
-          </box>
-        </geometry>
-        <material>
-          <ambient>1 1 1 1</ambient>
-          <diffuse>1 1 1 1</diffuse>
-          <specular>0 0 0 1</specular>
-          <emissive>0.2 0.2 0.2 1</emissive>
-          <pbr>
-            <metal>
-              <albedo_map>model://ackermann_bot/materials/textures/aruco_marker_0.png</albedo_map>
-              <roughness>1.0</roughness>
-              <metalness>0.0</metalness>
-            </metal>
-          </pbr>
-        </material>
-      </visual>
-    </link>
-
-    <!-- ============================================================= -->
     <!-- Joints                                                         -->
     <!-- ============================================================= -->
     <joint name="front_left_wheel_joint" type="revolute">
@@ -304,11 +292,6 @@
       </axis>
     </joint>
 
-    <joint name="aruco_marker_joint" type="fixed">
-      <parent>base_link</parent>
-      <child>aruco_marker_link</child>
-    </joint>
-
     <!-- ============================================================= -->
     <!-- Skid-steer / tank drive (built-in gz-sim DiffDrive system,     -->
     <!-- no ros2_control needed). All 4 wheels are driven; there is no  -->
@@ -331,11 +314,22 @@
       <min_acceleration>-3</min_acceleration>
       <max_acceleration>3</max_acceleration>
       <topic>cmd_vel</topic>
-      <odom_topic>odometry</odom_topic>
-      <frame_id>odom</frame_id>
-      <child_frame_id>base_link</child_frame_id>
-      <odom_publish_frequency>50</odom_publish_frequency>
-      <tf_topic>/tf</tf_topic>
+      <!-- Wheel odometry stays on the default /model/<name>/{odometry,tf}
+           topics, which are not bridged: the UGV is localised from the
+           marker only. -->
+    </plugin>
+
+    <!-- Ground-truth pose for checking the ArUco estimate. Validation only:
+         nothing in the control loop may subscribe to it. -->
+    <plugin
+        filename="gz-sim-odometry-publisher-system"
+        name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>world</odom_frame>
+      <robot_base_frame>ugv_ground_truth</robot_base_frame>
+      <odom_topic>/ugv/ground_truth</odom_topic>
+      <tf_topic>/ugv/ground_truth_tf</tf_topic>
+      <odom_publish_frequency>30</odom_publish_frequency>
+      <dimensions>3</dimensions>
     </plugin>
 
     <!-- Publishes joint angles/velocities so they can be bridged to

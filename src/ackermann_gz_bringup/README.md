@@ -86,9 +86,16 @@ The bridge exposes:
   into independent left-side / right-side wheel speeds (skid-steer), so a
   pure `angular.z` with zero `linear.x` spins the vehicle in place, like a
   tank.
-- `/odom` (`nav_msgs/Odometry`) ← vehicle odometry.
-- `/tf` ← `odom -> base_link` transform.
-- `/joint_states` (`sensor_msgs/JointState`) ← wheel/steering joint states.
+- `/ugv/ground_truth` (`nav_msgs/Odometry`, frame `world`) ← the true model
+  pose from the `OdometryPublisher` system. For checking the ArUco pose
+  estimate only; the UGV is never controlled from it.
+
+Wheel odometry and its `odom -> base_link` transform are still produced by
+`DiffDrive`, on `/model/ackermann_bot/odometry` and `/model/ackermann_bot/tf`,
+but are deliberately not bridged: the UGV is localised from its marker alone.
+`/clock` is not bridged here either; the UAV camera bridge is the one clock
+source. `DiffDrive` has no command timeout, so the vehicle keeps its last
+`/cmd_vel` until told otherwise.
 
 Example:
 
@@ -101,8 +108,13 @@ ros2 topic pub /cmd_vel geometry_msgs/msg/Twist \
 
 - Dictionary: `cv2.aruco.DICT_4X4_50`, marker id `0`, baked into
   `materials/textures/aruco_marker_0.png` with a white quiet-zone border.
-- It's a flat `0.15 x 0.15 x 0.005 m` plate fixed rigidly to the roof
-  (`aruco_marker_joint`, fixed), centered above the chassis.
+- It's a `0.55 x 0.55 m` `<plane>` visual on `base_link`, 2 mm above the roof
+  (0.127 m above `base_link`). The PNG has a 60 px white border round a
+  512 px marker, so the black square, which is the marker length OpenCV
+  needs, is `0.55 * 512 / 632 = 0.446 m`.
+- A plane maps the texture straight onto the link axes: image right is +X
+  (forward), image up is +Y. The previous 0.15 m box was about 12 px across
+  from 12 m up, too small to decode reliably.
 - To detect it from an external/overhead camera with OpenCV:
 
   ```python
@@ -130,9 +142,8 @@ Harmonic point releases. If a parameter is rejected or ignored on your
 install, run `gz sim -v 4` for plugin load warnings and cross-check against
 `gz sim --versions` / the installed `ros_gz` docs for your version.
 
-## Adding this vehicle to RViz (optional)
+## RViz
 
-Since the model is plain SDF (not URDF), `robot_state_publisher` isn't wired
-up here. If you want RViz visualization, the bridged `/tf` and
-`/joint_states` are enough to drive a URDF-based `robot_state_publisher`
-matching this geometry, or you can visualize directly from Gazebo's GUI.
+The UGV shows up in RViz as the `/ugv/pose` arrow from the `guidance`
+package's ArUco localiser, with `/ugv/ground_truth` next to it for
+comparison.

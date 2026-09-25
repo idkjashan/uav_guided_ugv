@@ -1,112 +1,179 @@
-# Handoff — integrating `road_survey`
+# Handoff: bringing stage 2 up in Gazebo
 
-For whoever (human or model) wires this into the running simulation. The
-algorithms are written and tested; what is left is plumbing against the real
-Gazebo topic names and a real flight. **Read `01_road_survey_plan.md` first** —
-it explains why the code is shaped this way.
+For whoever runs this on the Ubuntu machine (ROS 2 Humble, Gazebo Harmonic,
+PX4 at `~/PX4-Autopilot`). Everything below was written and tested offline
+without ROS; none of it has flown yet. Read `02_guidance.md` for why the code
+is shaped this way, and `01_road_survey_plan.md` for the mapper.
 
-## What is done
+## What changed in this round
 
-- `src/road_survey/` — an `ament_python` package, four executables.
-- 47 tests, all passing offline with no ROS and no simulator
-  (`pytest src/road_survey/test`). They cover frame conversions, unprojection,
-  grid statistics, the risk classifier, costmap encoding, and one end-to-end
-  simulated survey that ray-casts a synthetic hill road and checks the
-  recovered mask against ground truth (IoU 0.87).
+- New package `src/guidance`: UAV mission (takeoff, autonomous road survey,
+  return, track the UGV), ArUco UGV localiser, pure-pursuit UGV follower,
+  `pose_check` validation tool.
+- `bringup` is now launch files only: `sim.launch.py` (rewritten) and
+  `mission.launch.py` (new). The old `survey_mission` / `uav_launcher` nodes
+  and their launch files are gone. They force-armed PX4 past failing checks,
+  jumped position setpoints tens of metres, and left unused setpoint fields at
+  0.0 instead of NaN.
+- UGV model: the marker is now a 0.55 m plane (black square 0.446 m);
+  wheel odometry and `/tf` are no longer bridged; `/ugv/ground_truth` is
+  bridged for validation only; `/clock` comes from the UAV bridge alone.
+- Worlds: physics step 1 ms -> 4 ms (PX4's default; 4x less CPU).
+- UAV bridge: the depth point cloud is no longer bridged (nothing used it).
+- `road_survey/centerline.py`: spline smoothing fixed (it cut bends by up to
+  1 m). No other stage 1 change.
 
-## What is NOT done, in the order it will bite you
-
-1. **Real Gazebo topic names.** The launch file assumes the depth sensor
-   publishes on `/depth_camera` and `/depth_camera/camera_info`. Verify with
-   `gz topic -l | grep -i depth` before anything else. If the SDF's `<topic>`
-   differs, change the launch arguments — no code change is needed.
-2. **`camera_info` may not exist** for the depth sensor. That is fine: leave
-   `camera_info_topic` pointing at a topic that never publishes and the node
-   uses intrinsics derived from `depth_hfov_rad` (fx = fy = 432.5 for
-   640×480 @ 1.274 rad). Do check the encoding is `32FC1` and the units are
-   metres — `ros2 topic echo /uav/depth --field encoding --once`.
-3. **`use_sim_time`.** Must be true everywhere. If the node warns about it, or
-   warns repeatedly that the pose is far from the depth frame, this is why.
-4. **A real flight has never been run.** Nobody has confirmed the mapper
-   produces a sane map from actual Gazebo depth data. That is the first
-   integration task, not a formality.
-5. **Nav2 is not configured.** See below.
-6. **Stage 2** — ArUco pose, TF, Nav2 bringup — is not started.
-
-## First integration run
+## 0. Build and test offline
 
 ```bash
-cd ~/uav_guided_ugv
-colcon build --packages-select road_survey --symlink-install
-source install/setup.bash
-source ~/px4_ros_ws/install/setup.bash        # px4_msgs
+cd ~/uav_guided_ugv && git pull
+python3 -c "import skimage" || pip install --user "scikit-image<0.25"   # centre line
+rm -rf build/bringup install/bringup          # drop the old bringup python package
+colcon build --symlink-install
+source install/setup.bash && source ~/px4_ros_ws/install/setup.bash
+PYTHONPATH=src/road_survey:src/guidance python3 -m pytest src/road_survey/test src/guidance/test -q
 ```
 
-With PX4 SITL, Gazebo and `MicroXRCEAgent` already up:
+Expect `66 passed`. If `test_mission_sim.py` fails here but passed in WSL,
+stop and report it; it flies the whole mission logic.
+
+## 1. Simulation comes up
 
 ```bash
-ros2 launch road_survey survey.launch.py world:=drdo_world1
+ros2 launch bringup sim.launch.py world:=drdo_world2
 ```
 
-Then, before flying, confirm the four inputs are live:
+Wait for PX4's `Ready for takeoff!`, then in another terminal:
 
 ```bash
-ros2 topic hz /uav/depth                      # ~30 Hz
-ros2 topic hz /fmu/out/vehicle_local_position # ~50 Hz
-ros2 topic echo /road/stats --once            # after the first climb
-ros2 topic echo /road/costmap --field info --once
+ros2 topic info /clock                     # Publisher count: 1
+ros2 topic list | grep fmu/out             # note the names, see below
+ros2 topic hz /uav/rgb                     # ~30 Hz (less if RTF < 1)
+ros2 topic hz /uav/depth
+ros2 topic echo /ugv/ground_truth --once
 ```
 
-`frames_used` climbing while `frames_seen` climbs faster is correct — the node
-deliberately drops frames (rate limit, hover gate, tilt gate). `frames_used`
-stuck at 0 while `frames_seen` climbs means a gate is rejecting everything;
-the warnings say which.
+This PX4 build publishes `/fmu/out/vehicle_status_v1` and
+`/fmu/out/vehicle_local_position_v1` (versioned), but `vehicle_attitude`
+without a suffix. The nodes subscribe to both spellings, so either works.
+If neither form of a topic exists, the agent or `px4_msgs` is the problem,
+not the nodes.
 
-## Nav2 configuration for stage 2
+Check in the Gazebo GUI that the UGV has the large marker on its roof and
+note the real-time factor (bottom right).
 
-Two settings are not optional:
+## 2. UAV and localiser only, UGV parked
 
-```yaml
-global_costmap:
-  global_costmap:
-    ros__parameters:
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_topic: /road/costmap
-        subscribe_to_updates: false
-        trinary_costmap: false      # REQUIRED: keeps the centre-seeking gradient
-        lethal_cost_threshold: 100  # only 100 is lethal; 0..99 are real costs
+No survey, no follower: the UAV takes off, finds the UGV and holds over it.
+
+```bash
+P=$(ros2 pkg prefix guidance)/share/guidance/config/guidance.yaml
+ros2 run guidance ugv_localizer --ros-args --params-file $P -p use_sim_time:=true
+ros2 run guidance pose_check --ros-args -p use_sim_time:=true
+ros2 run guidance mission --ros-args --params-file $P -p use_sim_time:=true -p survey:=false
 ```
 
-With `trinary_costmap: true` (the default) every road cell collapses to free
-and the rover has no reason to stay near the centre — which is exactly what the
-rubric scores. Keep the inflation layer radius small (≤ 1 m); the road is only
-6–10 m wide and a large inflation will close it.
+Expected from `mission`: `state ARMING` -> `TAKEOFF` -> `ACQUIRE` ->
+`TRACK` within about 20 s, a smooth 1 m/s climb, then a steady hover about
+10 m above the UGV. From `ugv_localizer`, every 5 s:
+`frames N, marker seen M, poses published M`, with M close to 75 (15 Hz)
+once overhead. From `pose_check`: xy error in centimetres.
 
-If `/road/stats` reported `multi_level_cells > 0`, run `height_slicer` instead
-of `map_publisher` and feed it the UGV pose.
+**Calibrate the heading once.** `pose_check` prints
+`mean heading error +X deg (subtract R rad from yaw_offset_rad)`. It should
+be near 0; if it is near ±90 or 180 the texture sits rotated on the plate.
+Put the corrected value in `src/guidance/config/guidance.yaml`
+(`yaw_offset_rad`; with `--symlink-install` no rebuild is needed) and
+restart the localiser. Always write floats with a decimal point (`0.0`,
+`3.0`): Humble refuses a YAML integer for a float parameter and the node
+exits.
+
+Then drive the UGV by hand and watch the UAV follow:
+
+```bash
+ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.5}, angular: {z: 0.1}}"
+# Ctrl-C, then stop it explicitly: DiffDrive keeps the last command forever
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"
+```
+
+## 3. Full mission
+
+Restart the simulation (the UAV must start on the ground at its spawn), then:
+
+```bash
+ros2 launch bringup mission.launch.py
+ros2 run guidance pose_check --ros-args -p use_sim_time:=true   # optional, alongside
+```
+
+Expected: `TAKEOFF`, then `SURVEY` along the road at about 1.5 m/s and 12 m
+above it, `survey finished (road ended); saving map`, `RETURN` along the same
+track, `ACQUIRE`, `TRACK`. Then the follower logs
+`centre line L m, goal (x, y)` and the UGV drives to the end of the road with
+the UAV above it, ending with `goal reached: end of the road`. RViz shows the
+costmap, the magenta centre line, the red ArUco pose arrow and the green
+ground-truth arrow.
+
+To re-run stage 2 without surveying again:
+
+```bash
+ros2 launch bringup mission.launch.py survey:=false   # uses maps/road_map.npz
+```
+
+## 4. When something is wrong
+
+| Symptom | Likely cause | Check / fix |
+|---|---|---|
+| `waiting for /fmu/out/vehicle_status(_v1)` forever | no `/fmu/out` topics, or `px4_msgs` mismatch | `ros2 topic list \| grep fmu`; MicroXRCEAgent running |
+| `waiting for a valid PX4 local position` forever | EKF not initialised yet, or local position under another name | wait ~10 s after boot; `ros2 topic echo /fmu/out/vehicle_local_position_v1 --once` |
+| stuck in `ARMING`, warning every 10 s | a PX4 preflight check fails | `cd ~/PX4-Autopilot/build/px4_sitl_default && ./bin/px4-commander check` and `./bin/px4-listener failsafe_flags`. `NAV_DLL_ACT` must be 0 (airframe 4022 sets it; a saved parameter can override: `./bin/px4-param set NAV_DLL_ACT 0`). Do not force-arm |
+| `ABORTED` | PX4 left offboard (failsafe, RC, QGC) | PX4 console says why; restart the mission node |
+| `marker seen 0` with the UGV in view | marker too small (old model still loaded) or badly lit | rebuild `ackermann_gz_bringup`, restart Gazebo; look at `/uav/rgb` in `rqt_image_view` |
+| `no PX4 pose near the image time` | `use_sim_time` missing somewhere | every node needs `use_sim_time:=true` |
+| `pose_check` xy error > 0.5 m | wrong `marker_length_m` or pose/image timing | must be 0.446; report the numbers |
+| survey ends at once, `road ended` | heading points away from the road, or no costmap | `ros2 topic echo /road/stats`; set `heading_enu` (rad, ENU) |
+| survey leaves the road | stage 1 classification | tune with `tune_offline` (see `01_road_survey_plan.md`) |
+| UGV never moves in TRACK | no centre line (scikit-image missing) or costmap missing | follower log; `python3 -c "import skimage"` |
+| UGV turns in place and never drives | heading off by about 90 or 180 degrees | calibrate `yaw_offset_rad` (step 2) |
+| sim time jumps backwards, TF warnings | two `/clock` publishers | `ros2 topic info /clock` must show 1 |
+
+## 5. What to send back
+
+1. `ros2 topic list | grep fmu` output.
+2. `pose_check` lines with the UGV parked and while driving, and the
+   `yaw_offset_rad` you settled on.
+3. The mission node's log from launch to `TRACK` (state lines, survey end
+   reason, map save response).
+4. `maps/road_map.png`.
+5. A bag of the guided drive, from which the rubric metric can be computed:
+   ```bash
+   ros2 bag record -o ~/uav_guided_ugv/bags/guided /ugv/pose /ugv/ground_truth \
+     /ugv/cross_track_error /ugv/path /mission/state /cmd_vel /road/costmap /clock
+   ```
+6. Gazebo's real-time factor during the run.
 
 ## Interfaces
 
-| Node | In | Out |
-|---|---|---|
-| `terrain_mapper` | `/uav/depth`, `/uav/depth_camera_info`, `/fmu/out/vehicle_local_position`, `/fmu/out/vehicle_attitude` | `/road/costmap`, `/road/stats`, services `~/save` `~/reset` |
-| `map_publisher` | `road_map.npz` | `/road/costmap` (transient-local) |
-| `height_slicer` | `road_map.npz`, `/ugv/pose` | `/road/costmap` |
-| `tune_offline` | `road_map.npz` | PNG + npz per threshold set |
+| Topic | Type | Frame | From |
+|---|---|---|---|
+| `/road/costmap` | `nav_msgs/OccupancyGrid` (transient local) | `map` | `terrain_mapper` / `map_publisher` |
+| `/ugv/pose` | `geometry_msgs/PoseStamped`, stamp = image time | `map` | `ugv_localizer` |
+| `/mission/state` | `std_msgs/String` (transient local) | | `mission` |
+| `/ugv/path` | `nav_msgs/Path` (transient local) | `map` | `ugv_follower` |
+| `/ugv/cross_track_error` | `std_msgs/Float32`, m | | `ugv_follower` |
+| `/cmd_vel` | `geometry_msgs/Twist` | UGV body | `ugv_follower` |
+| `/ugv/ground_truth` | `nav_msgs/Odometry`, validation only | `world` | Gazebo |
 
-The `map` frame is **PX4's local ENU** — origin at the UAV's EKF init point,
-i.e. the UAV spawn pose, *not* the Gazebo world origin. If you need Gazebo
-world coordinates for scoring, apply the spawn pose from the world file as a
-static offset; do not change the mapper.
+`map` is PX4's local ENU with its origin at the UAV spawn; `world -> map` is
+the UAV spawn position with no rotation (static transform from
+`sim.launch.py`).
 
-## House rules for changes
+## House rules
 
-- `frames.py`, `depth.py`, `grid.py`, `risk.py`, `costmap.py`, `centerline.py`
-  are pure — numpy/scipy/cv2 only, no ROS imports. Keep them that way; that is
-  what makes the tests fast and the algorithms reviewable.
-- Any change to those files must keep `pytest src/road_survey/test` green.
-- Thresholds belong in `config/road_survey.yaml`, not in code.
-- Do not add `grid_map` / `elevation_mapping` as dependencies. They were
-  considered and rejected: the ROS 2 ports are unofficial, they drag in Eigen
-  and kindr, and the ~400 lines here are tested and understood.
+- `aruco.py`, `explore.py`, `mission.py`, `pursuit.py` and the `road_survey`
+  modules listed in `01_road_survey_plan.md` are pure: numpy/scipy/cv2, no
+  ROS. Keep them that way; it is what lets the whole mission be tested
+  offline.
+- Any change to them must keep both test suites green, `test_mission_sim.py`
+  above all.
+- Tunable values go in `config/guidance.yaml` / `config/road_survey.yaml`.
+- Nothing in the control loop may read `/ugv/ground_truth`.

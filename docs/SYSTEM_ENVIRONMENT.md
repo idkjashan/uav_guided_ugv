@@ -4,6 +4,11 @@ This document provides an exhaustive, mathematically rigorous, version-locked sp
 
 This file is designed as a single source of truth for high-reasoning AI models to generate precise, directly executable implementation plans and code for GPS-denied drone navigation and visual odometry.
 
+> Scope note: sections 6 (GPS-denied EKF2 parameters) and 9 (prompt guide)
+> were written for a different task, GPS-denied visual odometry. They do not
+> apply to this workspace: here PX4 flies with GPS, and setting
+> `EKF2_GPS_CTRL 0` would leave the survey without a position estimate.
+
 ---
 
 ## 1. Host System & Hardware Architecture

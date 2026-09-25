@@ -95,15 +95,63 @@ Visualization Manager:
         Value: /uav/pose
       Value: true
     - Alpha: 1
+      Axes Length: 0.8
+      Axes Radius: 0.08
+      Class: rviz_default_plugins/Pose
+      Color: 255; 50; 50
+      Enabled: true
+      Head Length: 0.4
+      Head Radius: 0.2
+      Name: UGV Pose (ArUco)
+      Shaft Length: 0.8
+      Shaft Radius: 0.08
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ugv/pose
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 255; 0; 255
+      Enabled: true
+      Head Diameter: 0.3
+      Head Length: 0.2
+      Length: 0.3
+      Line Style: Lines
+      Line Width: 0.03
+      Name: UGV Centre Line
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.03
+      Shaft Diameter: 0.1
+      Shaft Length: 0.1
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ugv/path
+      Value: true
+    - Alpha: 1
       Angle Tolerance: 0.1
       Class: rviz_default_plugins/Odometry
-      Color: 255; 50; 50
+      Color: 50; 255; 50
       Enabled: true
       Head Length: 0.3
       Head Radius: 0.15
-      Keep: 200
+      Keep: 1
       Length: 0.6
-      Name: UGV Rover Odometry
+      Name: UGV Ground Truth (validation)
       Position Tolerance: 0.1
       Radius: 0.05
       Shaft Length: 0.5
@@ -115,39 +163,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /odom
-      Value: true
-    - Alpha: 0.85
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: AxisColor
-      Decay Time: 0
-      Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
-      Name: UAV Depth Point Cloud
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.05
-      Style: Points
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /uav/points
-      Use Fixed Frame: true
-      Use rainbow: true
+        Value: /ugv/ground_truth
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true

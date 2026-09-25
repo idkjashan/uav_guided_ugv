@@ -3,28 +3,22 @@
 <package format="3">
   <name>bringup</name>
   <version>0.1.0</version>
-  <description>System bringup, orchestration launch files, URDF models, and mission controllers for the UAV-guided UGV system.</description>
+  <description>Launch files and world configuration for the UAV-guided UGV system.</description>
   <maintainer email="jashan@todo.todo">jashan</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
-  <depend>rclpy</depend>
-  <depend>geometry_msgs</depend>
-  <depend>nav_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
-  <depend>tf2_ros</depend>
-  <depend>robot_state_publisher</depend>
-  <depend>ros_gz_bridge</depend>
-  <depend>ros_gz_sim</depend>
-  <depend>rviz2</depend>
-
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>rviz2</exec_depend>
   <exec_depend>ackermann_gz_bringup</exec_depend>
   <exec_depend>drdo_gz_worlds</exec_depend>
   <exec_depend>road_survey</exec_depend>
-  <exec_depend>px4_msgs</exec_depend>
+  <exec_depend>guidance</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

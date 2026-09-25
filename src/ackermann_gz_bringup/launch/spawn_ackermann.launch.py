@@ -8,8 +8,8 @@ RUNNING in a separate terminal, e.g.:
 
 This launch file does NOT start gz sim itself. It only:
   1. Spawns the robot model into the named world via `ros_gz_sim create`.
-  2. Starts a ros_gz_bridge parameter_bridge so cmd_vel / odom / tf /
-     joint_states / clock are usable from ROS 2.
+  2. Starts a ros_gz_bridge for /cmd_vel and the validation-only
+     /ugv/ground_truth.
 
 Usage:
     ros2 launch ackermann_gz_bringup spawn_ackermann.launch.py world:=my_world
@@ -70,28 +70,18 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    # ROS <-> GZ topic bridge, namespaced to the spawned robot / world.
-    bridge_args = [
-        # Sim clock -> ROS clock
-        '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
-        # ROS geometry_msgs/Twist -> gz cmd_vel consumed by AckermannSteering
-        '/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
-        # gz odometry -> ROS nav_msgs/Odometry
-        '/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry',
-        # gz tf -> ROS tf2
-        '/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
-        # gz joint states -> ROS sensor_msgs/JointState
-        '/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model',
-    ]
-
+    # ROS <-> GZ bridge. Deliberately narrow: /clock comes from the UAV bridge
+    # (two /clock publishers make sim time jitter backwards), and wheel
+    # odometry / tf are not bridged because the UGV is localised from its
+    # ArUco marker only. /ugv/ground_truth is for validation, never control.
     bridge_node = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
         name='ackermann_bot_gz_bridge',
         output='screen',
-        arguments=bridge_args,
-        remappings=[
-            ('/odometry', '/odom'),
+        arguments=[
+            '/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
+            '/ugv/ground_truth@nav_msgs/msg/Odometry[gz.msgs.Odometry',
         ],
     )
 

@@ -1,0 +1,36 @@
+# Parameters for the guidance nodes. use_sim_time is set by mission.launch.py.
+# Defaults live in the code; everything here is a value you may want to tune.
+
+mission:
+  ros__parameters:
+    survey: true              # overridden by the launch argument
+    survey_agl_m: 12.0        # depth far clip is 19.1 m; road_survey plan says 10-15
+    track_agl_m: 10.0         # marker is ~43 px across from here
+    max_search_agl_m: 16.0    # climb to here when the UGV is lost
+    survey_speed: 1.5         # m/s; the costmap refreshes every 2 s
+    return_speed: 3.0
+    track_speed: 3.0
+    climb_speed: 1.0
+    end_misses: 3             # costmap updates with no road ahead before "road ended"
+    max_survey_m: 1500.0
+    heading_enu: .nan         # survey direction in rad (ENU); .nan = UAV spawn heading
+    lookahead_m: 5.0          # survey waypoint distance, inside the 6.7 m half-footprint
+    max_turn_deg: 80.0
+    ugv_timeout_s: 0.5
+
+ugv_localizer:
+  ros__parameters:
+    marker_id: 0
+    marker_length_m: 0.446    # black square of the 0.55 m plate (512 of 632 px)
+    marker_height_m: 0.127    # marker face above the UGV base_link
+    yaw_offset_rad: 0.0       # calibrate once against /ugv/ground_truth
+    max_rate_hz: 15.0
+
+ugv_follower:
+  ros__parameters:
+    lookahead_m: 1.5
+    max_speed: 0.8
+    max_yaw_rate: 1.0
+    min_turn_radius_m: 2.0
+    goal_tolerance_m: 0.5
+    pose_timeout_s: 0.5

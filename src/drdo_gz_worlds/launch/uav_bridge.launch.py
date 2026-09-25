@@ -5,8 +5,12 @@ Bridged topics:
   - Gazebo RGB image       -> /uav/rgb          (sensor_msgs/msg/Image)
   - Gazebo CameraInfo      -> /uav/camera_info  (sensor_msgs/msg/CameraInfo)
   - Gazebo Depth image     -> /uav/depth        (sensor_msgs/msg/Image)
-  - Gazebo PointCloud2     -> /uav/points       (sensor_msgs/msg/PointCloud2)
   - Gazebo sim clock       -> /clock            (rosgraph_msgs/msg/Clock)
+
+The depth point cloud is not bridged: nothing consumes it (the mapper
+unprojects the depth image itself) and at 640x480x30 Hz it costs more CPU
+than every node in the mission together. This bridge is the only /clock
+source; do not add another.
 
 Usage:
   ros2 launch drdo_gz_worlds uav_bridge.launch.py world:=drdo_world2
@@ -28,7 +32,6 @@ def launch_setup(context, *args, **kwargs):
     gz_rgb_info = f'/world/{world}/model/{model_name}/link/camera_link/sensor/IMX214/camera_info'
     gz_depth_image = '/depth_camera'
     gz_depth_info = '/camera_info'
-    gz_depth_points = '/depth_camera/points'
     gz_clock = f'/world/{world}/clock'
 
     bridge_args = [
@@ -36,7 +39,6 @@ def launch_setup(context, *args, **kwargs):
         f'{gz_rgb_info}@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
         f'{gz_depth_image}@sensor_msgs/msg/Image@gz.msgs.Image',
         f'{gz_depth_info}@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-        f'{gz_depth_points}@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked',
         f'{gz_clock}@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
     ]
 
@@ -51,7 +53,6 @@ def launch_setup(context, *args, **kwargs):
             (gz_rgb_info, '/uav/camera_info'),
             (gz_depth_image, '/uav/depth'),
             (gz_depth_info, '/uav/depth_camera_info'),
-            (gz_depth_points, '/uav/points'),
             (gz_clock, '/clock'),
         ],
     )

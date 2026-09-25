@@ -104,7 +104,10 @@ def smooth_path(xy: np.ndarray, spacing_m: float = 1.0,
     if xy.shape[0] < 4:
         return xy
     from scipy.interpolate import splev, splprep  # noqa: PLC0415
-    s = float(xy.shape[0]) if smoothing is None else float(smoothing)
+    # splprep's s bounds the sum of squared residuals (m^2). N * (0.1 m)^2
+    # keeps the spline within ~10 cm of the skeleton, which is the skeleton's
+    # own noise at 0.25 m cells. s = N allowed ~1 m and cut every bend.
+    s = 0.01 * xy.shape[0] if smoothing is None else float(smoothing)
     tck, _ = splprep([xy[:, 0], xy[:, 1]], s=s, k=3)
     seg = np.linalg.norm(np.diff(xy, axis=0), axis=1).sum()
     n = max(int(seg / max(spacing_m, 1e-3)), 2)

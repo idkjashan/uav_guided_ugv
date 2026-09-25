@@ -6,7 +6,9 @@ middle of the road is cheaper than its edges. Nothing else. No autonomy, no
 UGV, no ArUco. Stage 2 loads that grid and runs Nav2.
 
 Status: implemented in `src/road_survey`, 47 tests green including an
-end-to-end simulated survey.
+end-to-end simulated survey. Stage 2 (`02_guidance.md`) now flies this
+survey autonomously; the manual procedure in section 3 still works and is
+the fallback.
 
 ---
 
