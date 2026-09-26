@@ -1,21 +1,22 @@
 """Mission: map the road, bring the UAV back, guide the UGV to the end of it.
 
-    ros2 launch bringup mission.launch.py                  # survey, then guide
+    ros2 launch bringup mission.launch.py                  # interactive survey / guidance
     ros2 launch bringup mission.launch.py survey:=false    # reuse maps/road_map.npz
 
 Needs sim.launch.py (or the real vehicles) already running. Nodes:
-  terrain_mapper   depth + PX4 pose -> /road/costmap      (survey:=true)
-  map_publisher    saved road_map.npz -> /road/costmap    (survey:=false)
+  terrain_mapper   depth + PX4 pose -> /road/costmap & /terrain/pointcloud
   ugv_localizer    UAV RGB + PX4 pose -> /ugv/pose
-  mission          PX4 offboard: takeoff, survey, return, track the UGV
+  mission          Interactive PX4 controller: takeoff, survey, return, track UGV
   ugv_follower     /ugv/pose + /road/costmap -> /cmd_vel
+  pose_check       real-time validation comparing estimated pose vs ground truth
+  rviz2            pre-configured 3D visualization
 """
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -42,8 +43,12 @@ def launch_setup(context):
              parameters=[params, sim], output='screen'),
         Node(package='guidance', executable='ugv_follower', name='ugv_follower',
              parameters=[params, sim], output='screen'),
+        Node(package='guidance', executable='pose_check', name='pose_check',
+             parameters=[sim], condition=IfCondition(LaunchConfiguration('pose_check')),
+             output='screen'),
         Node(package='guidance', executable='mission', name='mission',
-             parameters=[params, sim, {'survey': survey}], output='screen'),
+             parameters=[params, sim, {'survey': survey}],
+             emulate_tty=True, output='screen'),
         Node(package='rviz2', executable='rviz2', arguments=['-d', rviz_cfg],
              parameters=[sim], condition=IfCondition(LaunchConfiguration('rviz'))),
     ]
@@ -51,11 +56,16 @@ def launch_setup(context):
 
 def generate_launch_description():
     return LaunchDescription([
+        SetEnvironmentVariable('ROS_DOMAIN_ID', os.environ.get('ROS_DOMAIN_ID', '42')),
+        SetEnvironmentVariable('ROS_LOCALHOST_ONLY', os.environ.get('ROS_LOCALHOST_ONLY', '0')),
         DeclareLaunchArgument('survey', default_value='true',
-                              description='false: skip the survey and load map_npz'),
+                              description='false: skip the survey and load map_npz directly'),
         DeclareLaunchArgument('map_npz', default_value='~/uav_guided_ugv/maps/road_map.npz'),
         DeclareLaunchArgument('params', default_value=os.path.join(
             get_package_share_directory('guidance'), 'config', 'guidance.yaml')),
-        DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('pose_check', default_value='true',
+                              description='Launch realtime ground truth pose validation node'),
+        DeclareLaunchArgument('rviz', default_value='true',
+                              description='Launch RViz2 with pre-configured camera & map views'),
         OpaqueFunction(function=launch_setup),
     ])

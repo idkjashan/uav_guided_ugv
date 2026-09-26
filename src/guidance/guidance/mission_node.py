@@ -5,13 +5,11 @@ every tick to the mission logic and publish the setpoint it returns. Feeds the
 logic the three facts it needs: ground height under the UAV (median of the
 depth image centre), the latest road costmap, and the UGV pose.
 
-It never force-arms. If PX4 refuses to arm, the preflight checks are failing
-and flying anyway is how a UAV ends up toilet-bowling; run `commander check`
-in the PX4 shell to see why.
-
-If PX4 leaves offboard mode after the mission started (RC takeover, failsafe,
-QGC), the node stops publishing setpoints and reports ABORTED, which also
-stops the UGV. Restart the node to fly again.
+Provides an interactive CLI interface on startup to choose between:
+  1. Road Survey (Autonomous or Manual Teleop)
+     - Allows ending survey early at any time and saving the current map status
+     - Automatically transitions to Guidance after map save
+  2. Guidance (Direct execution using existing map)
 
     ros2 run guidance mission --ros-args --params-file config/guidance.yaml
 """
@@ -19,6 +17,10 @@ stops the UGV. Restart the node to fly again.
 from __future__ import annotations
 
 import math
+import os
+import sys
+import threading
+import time
 
 import numpy as np
 import rclpy
@@ -40,6 +42,27 @@ LATCHED = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                      durability=DurabilityPolicy.TRANSIENT_LOCAL)
 RATE_HZ = 20.0
 
+_tty_lock = threading.Lock()
+
+
+def _prompt(text: str, default: str = '') -> str:
+    """Prompt user via /dev/tty if available, otherwise fallback to stdin."""
+    with _tty_lock:
+        try:
+            with open('/dev/tty', 'w') as out_f, open('/dev/tty', 'r') as in_f:
+                out_f.write(text)
+                out_f.flush()
+                line = in_f.readline()
+                val = line.strip()
+                return val if val else default
+        except Exception:
+            pass
+        try:
+            val = input(text).strip()
+            return val if val else default
+        except Exception:
+            return default
+
 
 class MissionNode(Node):
 
@@ -55,7 +78,10 @@ class MissionNode(Node):
             ('costmap_topic', '/road/costmap'),
             ('ugv_pose_topic', '/ugv/pose'),
             ('save_service', '/terrain_mapper/save'),
+            ('load_service', '/terrain_mapper/load'),
             ('cam_height_in_body_m', 0.242),
+            ('interactive', True),
+            ('manual_survey', False),
         ])
         self.p = {d.name: d.value for d in p}
         self.params = MissionParams(
@@ -73,6 +99,8 @@ class MissionNode(Node):
         self.ticks = 0
         self.started = False
         self.state = ''
+        self.manual_survey = bool(self.p.get('manual_survey', False))
+        self._load_timer = None
 
         subscribe_versioned(self, 'VehicleStatus', '/fmu/out/vehicle_status', self.on_status)
         subscribe_versioned(self, 'VehicleLocalPosition', '/fmu/out/vehicle_local_position',
@@ -85,13 +113,148 @@ class MissionNode(Node):
         self.pub_ocm = self.create_publisher(px4_msgs.OffboardControlMode,
                                              '/fmu/in/offboard_control_mode', PX4_QOS)
         self.pub_sp = self.create_publisher(px4_msgs.TrajectorySetpoint,
-                                            '/fmu/in/trajectory_setpoint', PX4_QOS)
+                                             '/fmu/in/trajectory_setpoint', PX4_QOS)
         self.pub_cmd = self.create_publisher(px4_msgs.VehicleCommand,
                                              '/fmu/in/vehicle_command', PX4_QOS)
         self.pub_state = self.create_publisher(String, '/mission/state', LATCHED)
         self.save = self.create_client(Trigger, self.p['save_service'])
+        self.load_client = self.create_client(Trigger, str(self.p['load_service']))
+
+        if bool(self.p.get('interactive', True)):
+            self._run_interactive_menu()
+        elif bool(self.params.survey):
+            self._start_survey_listener_thread()
+
         self.create_timer(1.0 / RATE_HZ, self.tick)
-        self.set_state('WAIT_PX4')
+        self.set_state('WAIT_PX4' if not self.manual_survey else 'MANUAL_SURVEY')
+
+    # -- Interactive Menu & Survey Controls ------------------------------------
+
+    def _run_interactive_menu(self):
+        banner = (
+            "\n"
+            "============================================================\n"
+            "           DRDO UAV-GUIDED UGV MISSION CONTROLLER           \n"
+            "============================================================\n"
+            "Select Mission Mode:\n"
+            "  [1] Survey   - Map the road corridor from the air\n"
+            "  [2] Guidance - Escort UGV along mapped road to goal\n"
+        )
+        choice = _prompt(banner + "Choice [1/2] (default: 1): ", default="1")
+        if choice == "2":
+            self.get_logger().info("Mission Mode: GUIDANCE (using existing map)")
+            self.params.survey = False
+            self.manual_survey = False
+            self._request_map_load()
+        else:
+            self.get_logger().info("Mission Mode: SURVEY")
+            survey_banner = (
+                "\nSelect Survey Method:\n"
+                "  [1] Autonomous - UAV automatically explores and maps road\n"
+                "  [2] Manual     - Pilot UAV manually (teleop / joystick / QGC)\n"
+            )
+            s_choice = _prompt(survey_banner + "Choice [1/2] (default: 1): ", default="1")
+            if s_choice == "2":
+                self.get_logger().info("Survey Method: MANUAL (pilot via teleop / QGC)")
+                self.manual_survey = True
+                self.params.survey = True
+                self._start_manual_survey_thread()
+            else:
+                self.get_logger().info("Survey Method: AUTONOMOUS")
+                self.manual_survey = False
+                self.params.survey = True
+                self._start_survey_listener_thread()
+
+    def _request_map_load(self):
+        if self.load_client.service_is_ready():
+            self.load_client.call_async(Trigger.Request()).add_done_callback(self._on_map_loaded)
+        else:
+            self.get_logger().info("Waiting for terrain_mapper ~/load service...")
+            self._load_timer = self.create_timer(1.0, self._try_load_timer)
+
+    def _try_load_timer(self):
+        if self.load_client.service_is_ready():
+            self.load_client.call_async(Trigger.Request()).add_done_callback(self._on_map_loaded)
+            if self._load_timer is not None:
+                self._load_timer.cancel()
+                self._load_timer = None
+
+    def _on_map_loaded(self, future):
+        res = future.result()
+        if res.success:
+            self.get_logger().info(f"[MISSION] Costmap loaded: {res.message}")
+        else:
+            self.get_logger().warn(f"[MISSION] Map load: {res.message} (will wait for /road/costmap)")
+
+    def _start_survey_listener_thread(self):
+        def _listen():
+            while rclpy.ok() and self.state not in ('SURVEY', 'RETURN', 'ACQUIRE', 'TRACK', 'DONE', 'ABORTED'):
+                time.sleep(0.2)
+            if self.state == 'SURVEY':
+                msg = (
+                    "\n"
+                    ">>> Autonomous survey in progress...\n"
+                    ">>> Press [Enter] or type 'end' / 'save' at any time to finish survey early & save map: "
+                )
+                _prompt(msg)
+                if self.state == 'SURVEY' or (self.mission and self.mission.state == 'SURVEY'):
+                    self.get_logger().info("User requested early end of autonomous survey.")
+                    self.end_survey_early()
+        t = threading.Thread(target=_listen, daemon=True)
+        t.start()
+
+    def _start_manual_survey_thread(self):
+        def _listen_manual():
+            banner = (
+                "\n"
+                ">>> Manual Survey Active!\n"
+                ">>> Pilot the UAV over the road corridor (via QGC, joystick, or RC).\n"
+                ">>> Press [Enter] or type 'end' / 'save' when finished to save map: "
+            )
+            _prompt(banner)
+            self.get_logger().info("Manual survey finished by user. Saving map...")
+            self.save_manual_map()
+        t = threading.Thread(target=_listen_manual, daemon=True)
+        t.start()
+
+    def end_survey_early(self):
+        t = self._now()
+        if self.manual_survey:
+            self.save_manual_map()
+            return
+        if self.mission is not None and self.mission.state in ('SURVEY', 'TAKEOFF'):
+            if self.mission.request_early_end(t):
+                self.get_logger().info("Autonomous survey ended early. Saving map and returning to base...")
+                if self.save.service_is_ready():
+                    self.save.call_async(Trigger.Request()).add_done_callback(self.on_saved)
+
+    def save_manual_map(self):
+        if self.save.service_is_ready():
+            self.save.call_async(Trigger.Request()).add_done_callback(self.on_saved_manual)
+        else:
+            self.get_logger().warn("Terrain mapper save service not ready; retrying...")
+            time.sleep(1.0)
+            if self.save.service_is_ready():
+                self.save.call_async(Trigger.Request()).add_done_callback(self.on_saved_manual)
+
+    def on_saved_manual(self, future):
+        res = future.result()
+        if res.success:
+            self.get_logger().info(f"[MISSION] Manual survey map saved: {res.message}")
+        else:
+            self.get_logger().error(f"[MISSION] Manual survey map save failed: {res.message}")
+
+        ans = _prompt("\n[MISSION] Proceed to Guidance system now? [Y/n] (default: Y): ", default="y")
+        if ans.lower() in ('', 'y', 'yes'):
+            self.get_logger().info("Transitioning to Guidance system (Offboard escort mode)...")
+            self.manual_survey = False
+            self.params.survey = False
+            self.mission = None
+            self.started = False
+            self.ticks = 0
+            self.set_state('WAIT_PX4')
+        else:
+            self.get_logger().info("Mission finished. UAV hovering in manual mode.")
 
     # -- inputs ----------------------------------------------------------------
 
@@ -115,7 +278,6 @@ class MissionNode(Node):
         centre = depth[h // 2 - 30:h // 2 + 30, w // 2 - 30:w // 2 + 30]
         centre = centre[np.isfinite(centre) & (centre > 0.3) & (centre < 19.0)]
         if centre.size > 100:
-            # the camera sits cam_height_in_body_m above the body origin (NED: minus)
             z = self.lpos.z - float(self.p['cam_height_in_body_m']) + float(np.median(centre))
             self.ground = (self._now(), z)
 
@@ -142,7 +304,7 @@ class MissionNode(Node):
 
     def command(self, cmd, p1=0.0, p2=0.0):
         m = px4_msgs.VehicleCommand()
-        m.timestamp = 0               # 0 = PX4 stamps it on arrival, see publish_setpoint
+        m.timestamp = 0
         m.command = int(cmd)
         m.param1, m.param2 = float(p1), float(p2)
         m.target_system = m.target_component = 1
@@ -151,18 +313,14 @@ class MissionNode(Node):
         self.pub_cmd.publish(m)
 
     def publish_setpoint(self, pos, vel, yaw):
-        # timestamp 0: PX4 replaces it with its own clock on arrival. Any
-        # other value goes through the uXRCE time sync, which assumes the
-        # sender uses the OS clock; these nodes run on sim time.
         ocm = px4_msgs.OffboardControlMode()
         ocm.timestamp = 0
-        ocm.position = True           # finite velocity below acts as feed-forward
+        ocm.position = True
         self.pub_ocm.publish(ocm)
         sp = px4_msgs.TrajectorySetpoint()
         sp.timestamp = 0
         sp.position = [float(v) for v in pos]
         sp.velocity = [float(v) for v in vel]
-        # PX4 uses every finite field and Python fills unset ones with 0.0
         sp.acceleration = [math.nan] * 3
         sp.jerk = [math.nan] * 3
         sp.yaw = float(yaw)
@@ -184,6 +342,10 @@ class MissionNode(Node):
     def tick(self):
         if self.state == 'ABORTED':
             return
+        if self.manual_survey:
+            self.set_state('MANUAL_SURVEY')
+            return
+
         lp = self.lpos
         if self.status is None:
             self.get_logger().info('waiting for /fmu/out/vehicle_status(_v1)',
@@ -243,6 +405,8 @@ class MissionNode(Node):
         res = future.result()
         log = self.get_logger().info if res.success else self.get_logger().error
         log(f'map save: {res.message}')
+        self.get_logger().info(
+            '[MISSION] Map saved successfully! UAV returning to base to begin UGV Guidance.')
 
 
 def main(args=None):

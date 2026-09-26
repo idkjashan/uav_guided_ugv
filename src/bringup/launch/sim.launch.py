@@ -43,10 +43,13 @@ def launch_setup(context):
         PythonLaunchDescriptionSource(os.path.join(ugv_pkg, 'launch', 'spawn_ackermann.launch.py')),
         launch_arguments={'world': world, **{k: str(v) for k, v in ugv.items()}}.items())]))
 
+    domain_id = str(os.environ.get('ROS_DOMAIN_ID', '42'))
+
     agent = shutil.which('MicroXRCEAgent')
     if agent is None:
         raise RuntimeError('MicroXRCEAgent not on PATH')
     actions.append(ExecuteProcess(cmd=[agent, 'udp4', '-p', '8888'],
+                                  additional_env={'ROS_DOMAIN_ID': domain_id},
                                   name='micro_xrce_agent', output='screen'))
 
     px4_bin = os.path.join(px4_dir, 'build', 'px4_sitl_default', 'bin', 'px4')
@@ -59,7 +62,8 @@ def launch_setup(context):
         additional_env={'PX4_GZ_STANDALONE': '1',
                         'PX4_SIM_MODEL': LaunchConfiguration('uav_model').perform(context),
                         'PX4_GZ_WORLD': world,
-                        'PX4_GZ_MODEL_POSE': pose},
+                        'PX4_GZ_MODEL_POSE': pose,
+                        'ROS_DOMAIN_ID': domain_id},
         name='px4_sitl', output='screen')]))
 
     # PX4's local frame (our 'map') is the gz world shifted to the UAV spawn
@@ -86,6 +90,8 @@ def generate_launch_description():
         os.environ.get('GZ_SIM_RESOURCE_PATH', ''),
     ])
     return LaunchDescription([
+        SetEnvironmentVariable('ROS_DOMAIN_ID', os.environ.get('ROS_DOMAIN_ID', '42')),
+        SetEnvironmentVariable('ROS_LOCALHOST_ONLY', os.environ.get('ROS_LOCALHOST_ONLY', '0')),
         SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', resource_path),
         SetEnvironmentVariable('GZ_PARTITION', os.environ.get('GZ_PARTITION', 'uav_ugv')),
         SetEnvironmentVariable('__NV_PRIME_RENDER_OFFLOAD', '1'),

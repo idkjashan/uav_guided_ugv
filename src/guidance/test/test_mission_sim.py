@@ -175,3 +175,19 @@ def test_ugv_drives_the_centre_line_to_the_end(flight):
     assert np.median(cte[joined]) < 0.1
     assert np.percentile(cte[joined], 95) < 0.3
     assert cte[joined].max() < 0.4
+
+
+def test_early_survey_end():
+    p = MissionParams(survey=True)
+    m = Mission(p, [0.0, 0.0, 0.0], 0.0, 0.0)
+    # Step through takeoff to reach survey
+    for i in range(250):
+        t = i * DT
+        m.step(t, DT, [0.0, 0.0, -12.0])
+    assert m.state == SURVEY
+    # Trigger early end
+    assert m.request_early_end(15.0)
+    assert m.state == RETURN
+    assert m.save_requested
+    assert m.end_reason == 'user ended survey early'
+

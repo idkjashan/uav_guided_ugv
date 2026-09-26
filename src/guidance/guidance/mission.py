@@ -179,6 +179,26 @@ class Mission:
             self.save_requested = True
             self._enter(RETURN, t)
 
+    def request_early_end(self, t):
+        """End the survey early on user command, save the map and return to base."""
+        if self.state == SURVEY:
+            self.end_reason = 'user ended survey early'
+            self.crumbs.append(self.sp.copy())
+            self.crumb_i = len(self.crumbs) - 1
+            self.save_requested = True
+            self._enter(RETURN, t)
+            return True
+        elif self.state == TAKEOFF:
+            self.end_reason = 'survey cancelled during takeoff'
+            self.crumbs = [self.sp.copy()]
+            self.crumb_i = 0
+            self.save_requested = True
+            self.goal = self.home.copy()
+            self.goal[2] = self.home[2] - self.p.track_agl_m
+            self._enter(ACQUIRE, t)
+            return True
+        return False
+
     def _return(self, t, dt, uav, costmap, ugv):
         # Retrace the survey: every breadcrumb was at survey height over the
         # terrain under it, so the way back cannot fly into a hillside.

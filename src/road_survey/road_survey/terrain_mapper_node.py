@@ -28,7 +28,8 @@ from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
                        ReliabilityPolicy, qos_profile_sensor_data)
-from sensor_msgs.msg import CameraInfo, Image
+from sensor_msgs.msg import CameraInfo, Image, PointCloud2
+import sensor_msgs_py.point_cloud2 as pc2
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from tf2_ros import TransformBroadcaster
@@ -164,7 +165,9 @@ class TerrainMapper(Node):
         if self.p['publish_elevation_image']:
             self.pub_elev = self.create_publisher(Image, '/terrain/elevation', 1)
 
+        self.pub_cloud = self.create_publisher(PointCloud2, '/terrain/pointcloud', 10)
         self.create_service(Trigger, '~/save', self.on_save)
+        self.create_service(Trigger, '~/load', self.on_load)
         self.create_service(Trigger, '~/reset', self.on_reset)
         self.create_timer(float(self.p['classify_period_s']), self.on_classify)
 
@@ -310,6 +313,13 @@ class TerrainMapper(Node):
         self.t_last_frame = t
         self.last_integrated = (p_map, yaw)
 
+        if self.pub_cloud is not None and pts_map.shape[0] > 0:
+            stride_sub = max(1, pts_map.shape[0] // 500)
+            sub = pts_map[::stride_sub]
+            cloud_msg = pc2.create_cloud_xyz32(msg.header, sub.astype(np.float32))
+            cloud_msg.header.frame_id = str(self.p['map_frame'])
+            self.pub_cloud.publish(cloud_msg)
+
     def _init_grid(self, p_map):
         if self.p['auto_center']:
             cx, cy = float(p_map[0]), float(p_map[1])
@@ -418,6 +428,36 @@ class TerrainMapper(Node):
         resp.success = True
         resp.message = ' '.join(paths)
         self.get_logger().info(f'saved: {resp.message}')
+        return resp
+
+    def on_load(self, _req, resp):
+        path = os.path.expanduser(str(self.p['output_dir']))
+        f = os.path.join(path, str(self.p['output_name']) + '.npz')
+        if not os.path.isfile(f):
+            resp.success = False
+            resp.message = f'{f} not found'
+            self.get_logger().error(resp.message)
+            return resp
+        try:
+            data = mapio.load_npz(f)
+            msg = OccupancyGrid()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = str(self.p['map_frame'])
+            msg.info.resolution = float(data['resolution'])
+            msg.info.width = int(data['occ'].shape[1])
+            msg.info.height = int(data['occ'].shape[0])
+            msg.info.origin.position.x = float(data['origin_x'])
+            msg.info.origin.position.y = float(data['origin_y'])
+            msg.info.origin.orientation.w = 1.0
+            msg.data = array.array('b', data['occ'].astype(np.int8).tobytes())
+            self.pub_map.publish(msg)
+            resp.success = True
+            resp.message = f'loaded map from {f}'
+            self.get_logger().info(resp.message)
+        except Exception as exc:  # noqa: BLE001
+            resp.success = False
+            resp.message = f'failed to load {f}: {exc}'
+            self.get_logger().error(resp.message)
         return resp
 
     def on_reset(self, _req, resp):
