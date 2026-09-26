@@ -22,7 +22,7 @@ from nav_msgs.msg import Path as PathMsg
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
-from std_msgs.msg import Float32, String
+from std_msgs.msg import Bool, Float32, String
 
 from .pursuit import PursuitParams, centerline_path, command
 
@@ -61,6 +61,7 @@ class UgvFollower(Node):
         self.pub_cmd = self.create_publisher(Twist, self.p['cmd_vel_topic'], 10)
         self.pub_path = self.create_publisher(PathMsg, '/ugv/path', LATCHED)
         self.pub_cte = self.create_publisher(Float32, '/ugv/cross_track_error', 10)
+        self.pub_goal = self.create_publisher(Bool, '/ugv/goal_reached', LATCHED)
         self.create_timer(1.0 / float(self.p['rate_hz']), self.tick)
 
     def on_pose(self, msg: PoseStamped):
@@ -125,6 +126,7 @@ class UgvFollower(Node):
         if cmd.done:
             self.done = True
             self.stop()
+            self.pub_goal.publish(Bool(data=True))
             self.get_logger().info('goal reached: end of the road')
             return
         out = Twist()

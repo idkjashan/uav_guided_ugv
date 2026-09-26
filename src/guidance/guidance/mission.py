@@ -11,7 +11,7 @@ at a bounded speed, and its velocity goes to PX4 as feed-forward. Jumping a
 position setpoint tens of metres makes PX4 fly flat out at MPC_XY_VEL_MAX,
 which is the "erratic" flight this replaces.
 
-    TAKEOFF -> SURVEY -> RETURN -> ACQUIRE -> TRACK
+    TAKEOFF -> SURVEY -> RETURN -> ACQUIRE -> TRACK -> DONE
        \\___(survey disabled)___/
 """
 
@@ -24,7 +24,8 @@ import numpy as np
 
 from .explore import ExploreParams, next_waypoint
 
-TAKEOFF, SURVEY, RETURN, ACQUIRE, TRACK = 'TAKEOFF', 'SURVEY', 'RETURN', 'ACQUIRE', 'TRACK'
+TAKEOFF, SURVEY, RETURN, ACQUIRE, TRACK, DONE = (
+    'TAKEOFF', 'SURVEY', 'RETURN', 'ACQUIRE', 'TRACK', 'DONE')
 
 
 def swap_xy(v):
@@ -80,6 +81,7 @@ class Mission:
         self.ground_z = None         # NED z of the ground under the UAV
         self.ugv_z = None            # ENU z of the UGV, last seen
         self.last_seen = None
+        self.goal_reached = False    # the UGV follower reached the end of the road
         self.save_requested = False  # the node calls the mapper's save service
         self.end_reason = ''
 
@@ -113,12 +115,14 @@ class Mission:
 
     # -- the tick --------------------------------------------------------------
 
-    def step(self, t, dt, uav_ned, ground_z=None, costmap=None, ugv=None) -> Setpoint:
+    def step(self, t, dt, uav_ned, ground_z=None, costmap=None, ugv=None,
+             goal_reached=False) -> Setpoint:
         """One tick.
 
         ``ground_z``  NED z of the ground below the UAV (from depth), or None.
         ``costmap``   (occ, origin_x, origin_y, res) when a new one arrived, else None.
         ``ugv``       (x, y, z) ENU of the UGV if seen within the timeout, else None.
+        ``goal_reached``  the UGV follower has reached the end of the road.
         """
         if ground_z is not None:
             a = self.p.ground_filter
@@ -127,6 +131,7 @@ class Mission:
         if ugv is not None:
             self.last_seen = t
             self.ugv_z = float(ugv[2])
+        self.goal_reached = self.goal_reached or bool(goal_reached)
         getattr(self, '_' + self.state.lower())(t, dt, np.asarray(uav_ned, float),
                                                 costmap, ugv)
         return Setpoint(self.sp.copy(), self.vel.copy(), self.yaw)
@@ -196,7 +201,9 @@ class Mission:
 
     def _track(self, t, dt, uav, costmap, ugv):
         p = self.p
-        if ugv is not None:
+        if self.goal_reached:
+            self._enter(DONE, t)
+        elif ugv is not None:
             self.goal[:2] = swap_xy(ugv[:2])
             self.goal[2] = -self.ugv_z - p.track_agl_m
         elif self.last_seen is not None and t - self.last_seen > p.search_after_s:
@@ -205,3 +212,7 @@ class Mission:
         # UGV by ~v/MPC_XY_P (~1 m at 1 m/s). Fine at 10 m; add an
         # alpha-beta velocity estimate if the marker ever leaves the frame.
         self._move(p.track_speed, dt)
+
+    def _done(self, t, dt, uav, costmap, ugv):
+        # The UGV has stopped at the end of the road; hold over it.
+        self._move(self.p.track_speed, dt)

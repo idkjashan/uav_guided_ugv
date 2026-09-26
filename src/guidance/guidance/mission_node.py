@@ -27,7 +27,7 @@ from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Image
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
 
 from road_survey.depth import decode_image
@@ -68,6 +68,7 @@ class MissionNode(Node):
         self.ground = None        # (t, NED z of the ground)
         self.costmap = None       # newest costmap not yet handed to the mission
         self.ugv = None           # (t, x, y, z) ENU
+        self.goal_reached = False
         self.mission = None
         self.ticks = 0
         self.started = False
@@ -80,6 +81,7 @@ class MissionNode(Node):
                                  qos_profile_sensor_data)
         self.create_subscription(OccupancyGrid, self.p['costmap_topic'], self.on_costmap, LATCHED)
         self.create_subscription(PoseStamped, self.p['ugv_pose_topic'], self.on_ugv, 10)
+        self.create_subscription(Bool, '/ugv/goal_reached', self.on_goal_reached, LATCHED)
         self.pub_ocm = self.create_publisher(px4_msgs.OffboardControlMode,
                                              '/fmu/in/offboard_control_mode', PX4_QOS)
         self.pub_sp = self.create_publisher(px4_msgs.TrajectorySetpoint,
@@ -126,6 +128,9 @@ class MissionNode(Node):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         pos = msg.pose.position
         self.ugv = (t, pos.x, pos.y, pos.z)
+
+    def on_goal_reached(self, msg):
+        self.goal_reached = self.goal_reached or msg.data
 
     # -- PX4 -------------------------------------------------------------------
 
@@ -220,7 +225,8 @@ class MissionNode(Node):
         ugv = (self.ugv[1:] if self.ugv and t - self.ugv[0] < float(self.p['ugv_timeout_s'])
                else None)
         costmap, self.costmap = self.costmap, None
-        sp = self.mission.step(t, 1.0 / RATE_HZ, [lp.x, lp.y, lp.z], ground, costmap, ugv)
+        sp = self.mission.step(t, 1.0 / RATE_HZ, [lp.x, lp.y, lp.z], ground, costmap, ugv,
+                               self.goal_reached)
         self.publish_setpoint(sp.pos, sp.vel, sp.yaw)
         self.set_state(self.mission.state)
 

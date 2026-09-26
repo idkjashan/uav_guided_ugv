@@ -5,9 +5,10 @@ the ArUco marker on its roof and hold station over it while the UGV drives
 the road centre line to the end of the road. The UGV has no sensors and we
 use no wheel odometry: its only pose is the one the UAV measures.
 
-Status: implemented in `src/guidance`. 19 offline tests, including a whole
-mission flown against a toy world (section 6). Not yet flown in Gazebo;
-`HANDOFF.md` is the integration checklist.
+Status: implemented in `src/guidance` and run end to end in Gazebo on
+`drdo_world2` (2026-09-26): survey, return, lock-on and the UGV following the
+centre line. 20 offline tests, including a whole mission flown against a toy
+world (section 6). `HANDOFF.md` is the bring-up checklist.
 
 ---
 
@@ -35,7 +36,7 @@ mission can be tested without a simulator.
 ## 2. Mission states
 
 ```
-TAKEOFF -> SURVEY -> RETURN -> ACQUIRE -> TRACK
+TAKEOFF -> SURVEY -> RETURN -> ACQUIRE -> TRACK -> DONE
     \_______ survey:=false _______/
 ```
 
@@ -54,6 +55,8 @@ TAKEOFF -> SURVEY -> RETURN -> ACQUIRE -> TRACK
   seen for 3 s, climb towards 16 m to widen the view.
 - **TRACK.** Hold 10 m above the UGV. If the marker is lost the setpoint stops
   where it is, and after 3 s the UAV climbs towards 16 m.
+- **DONE.** The follower reached the end of the road and published
+  `/ugv/goal_reached`; the UAV holds over the stopped UGV.
 
 The setpoint never jumps. It is a carrot that moves towards the current goal
 at a bounded speed (1.5 m/s survey, 3 m/s return and track, 1 m/s vertical),
@@ -165,7 +168,7 @@ any mission state other than TRACK, publishes a zero `Twist`. The gz
 
 ## 6. Offline results
 
-`pytest src/road_survey/test src/guidance/test`: 66 tests, about 4 s.
+`pytest src/road_survey/test src/guidance/test`: 67 tests, a few seconds.
 
 `test_mission_sim.py` flies the real mission, explorer, centre line and pure
 pursuit code against a toy world. The road is 110 m long, climbs 6 % and

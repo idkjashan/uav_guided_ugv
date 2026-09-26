@@ -17,7 +17,7 @@ import math
 import numpy as np
 import pytest
 
-from guidance.mission import ACQUIRE, RETURN, SURVEY, TRACK, Mission, MissionParams
+from guidance.mission import ACQUIRE, DONE, RETURN, SURVEY, TRACK, Mission, MissionParams
 from guidance.pursuit import PursuitParams, centerline_path, command
 from road_survey import costmap as cm
 
@@ -65,6 +65,7 @@ def fly():
     s = None
     log = {'state': [], 'agl': [], 'uav': [], 'ugv': [], 'visible': [], 'cte': []}
     done = False
+    t_done = None
 
     for k in range(int(1500 / DT)):
         t = k * DT
@@ -90,7 +91,7 @@ def fly():
         seen_ugv = ((ugv[0] + rng.normal(0, 0.03), ugv[1] + rng.normal(0, 0.03), gz)
                     if vis else None)
 
-        sp = m.step(t, DT, uav, ground_z, costmap, seen_ugv)
+        sp = m.step(t, DT, uav, ground_z, costmap, seen_ugv, goal_reached=done)
         v = 0.95 * (sp.pos - uav) + sp.vel
         n = np.linalg.norm(v[:2])
         if n > 8.0:
@@ -104,8 +105,8 @@ def fly():
                 cmd = command(seen_ugv[0], seen_ugv[1], ugv[2], path, s, PursuitParams())
                 s = cmd.s
                 if cmd.done:
-                    done = True
-                    break
+                    done, t_done = True, t
+                    continue
                 ugv[0] += cmd.v * math.cos(ugv[2]) * DT
                 ugv[1] += cmd.v * math.sin(ugv[2]) * DT
                 ugv[2] += cmd.w * DT
@@ -116,6 +117,8 @@ def fly():
         log['uav'].append(e)
         log['ugv'].append(list(ugv))
         log['visible'].append(vis)
+        if t_done is not None and t - t_done > 10.0:     # watch the UAV hold for 10 s
+            break
     log = {k: np.array(v) for k, v in log.items()}
     return m, log, done, ugv
 
@@ -143,7 +146,17 @@ def test_survey_holds_height_above_the_climbing_road(flight):
 def test_returns_and_locks_on(flight):
     _, log, _, _ = flight
     states = list(dict.fromkeys(log['state']))
-    assert states == ['TAKEOFF', SURVEY, RETURN, ACQUIRE, TRACK]
+    assert states == ['TAKEOFF', SURVEY, RETURN, ACQUIRE, TRACK, DONE]
+
+
+def test_holds_over_the_ugv_once_it_has_arrived(flight):
+    _, log, done, ugv = flight
+    assert done
+    held = log['uav'][log['state'] == DONE]
+    assert len(held) > 100
+    off = np.hypot(held[-50:, 0] - ugv[0], held[-50:, 1] - ugv[1])
+    assert off.max() < 0.3                          # settled over the stopped UGV
+    assert np.ptp(held[-50:, 2]) < 0.05             # and holding height
 
 
 def test_ugv_never_leaves_the_frame_while_tracked(flight):

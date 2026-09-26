@@ -2,8 +2,8 @@
 set -e
 
 source /opt/ros/humble/setup.bash
-source /home/jashan/px4_ros_ws/install/setup.bash
-source /home/jashan/uav_guided_ugv/install/setup.bash
+source "$HOME/px4_ros_ws/install/setup.bash"
+source "$(dirname "$(readlink -f "$0")")/install/setup.bash"
 
 echo "Starting pose_check in background..."
 ros2 run guidance pose_check --ros-args -p use_sim_time:=true &

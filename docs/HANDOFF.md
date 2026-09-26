@@ -1,9 +1,10 @@
 # Handoff: bringing stage 2 up in Gazebo
 
 For whoever runs this on the Ubuntu machine (ROS 2 Humble, Gazebo Harmonic,
-PX4 at `~/PX4-Autopilot`). Everything below was written and tested offline
-without ROS; none of it has flown yet. Read `02_guidance.md` for why the code
-is shaped this way, and `01_road_survey_plan.md` for the mapper.
+PX4 at `~/PX4-Autopilot`). The whole mission has run end to end on
+`drdo_world2` (2026-09-26); this checklist is still the order to bring it up
+on a new machine or world. `ARCHITECTURE_AND_APPROACH.md` is the overview,
+`02_guidance.md` the reasoning, `01_road_survey_plan.md` the mapper.
 
 ## What changed in this round
 
@@ -34,7 +35,7 @@ source install/setup.bash && source ~/px4_ros_ws/install/setup.bash
 PYTHONPATH=src/road_survey:src/guidance python3 -m pytest src/road_survey/test src/guidance/test -q
 ```
 
-Expect `66 passed`. If `test_mission_sim.py` fails here but passed in WSL,
+Expect `67 passed`. If `test_mission_sim.py` fails here but passed in WSL,
 stop and report it; it flies the whole mission logic.
 
 ## 1. Simulation comes up
@@ -109,7 +110,8 @@ Expected: `TAKEOFF`, then `SURVEY` along the road at about 1.5 m/s and 12 m
 above it, `survey finished (road ended); saving map`, `RETURN` along the same
 track, `ACQUIRE`, `TRACK`. Then the follower logs
 `centre line L m, goal (x, y)` and the UGV drives to the end of the road with
-the UAV above it, ending with `goal reached: end of the road`. RViz shows the
+the UAV above it, ending with `goal reached: end of the road` and the mission
+in `DONE`, holding over the stopped UGV. RViz shows the
 costmap, the magenta centre line, the red ArUco pose arrow and the green
 ground-truth arrow.
 
@@ -126,6 +128,7 @@ ros2 launch bringup mission.launch.py survey:=false   # uses maps/road_map.npz
 | `waiting for /fmu/out/vehicle_status(_v1)` forever | no `/fmu/out` topics, or `px4_msgs` mismatch | `ros2 topic list \| grep fmu`; MicroXRCEAgent running |
 | `waiting for a valid PX4 local position` forever | EKF not initialised yet, or local position under another name | wait ~10 s after boot; `ros2 topic echo /fmu/out/vehicle_local_position_v1 --once` |
 | stuck in `ARMING`, warning every 10 s | a PX4 preflight check fails | `cd ~/PX4-Autopilot/build/px4_sitl_default && ./bin/px4-commander check` and `./bin/px4-listener failsafe_flags`. `NAV_DLL_ACT` must be 0 (airframe 4022 sets it; a saved parameter can override: `./bin/px4-param set NAV_DLL_ACT 0`). Do not force-arm |
+| no GPS fix / EKF never valid, after using the same PX4 for GPS-denied work | saved PX4 parameters from that work (GPS fusion off) | stop PX4, `rm -f ~/PX4-Autopilot/build/px4_sitl_default/rootfs/parameters*.bson ~/PX4-Autopilot/build/px4_sitl_default/rootfs/eeprom/parameters*`, restart |
 | `ABORTED` | PX4 left offboard (failsafe, RC, QGC) | PX4 console says why; restart the mission node |
 | `marker seen 0` with the UGV in view | marker too small (old model still loaded) or badly lit | rebuild `ackermann_gz_bringup`, restart Gazebo; look at `/uav/rgb` in `rqt_image_view` |
 | `no PX4 pose near the image time` | `use_sim_time` missing somewhere | every node needs `use_sim_time:=true` |
@@ -140,7 +143,9 @@ ros2 launch bringup mission.launch.py survey:=false   # uses maps/road_map.npz
 
 1. `ros2 topic list | grep fmu` output.
 2. `pose_check` lines with the UGV parked and while driving, and the
-   `yaw_offset_rad` you settled on.
+   `yaw_offset_rad` you settled on. The last `centre-line deviation` line
+   of a run is the result to quote: the true UGV's distance from the centre
+   line over the whole drive.
 3. The mission node's log from launch to `TRACK` (state lines, survey end
    reason, map save response).
 4. `maps/road_map.png`.
@@ -158,6 +163,7 @@ ros2 launch bringup mission.launch.py survey:=false   # uses maps/road_map.npz
 | `/road/costmap` | `nav_msgs/OccupancyGrid` (transient local) | `map` | `terrain_mapper` / `map_publisher` |
 | `/ugv/pose` | `geometry_msgs/PoseStamped`, stamp = image time | `map` | `ugv_localizer` |
 | `/mission/state` | `std_msgs/String` (transient local) | | `mission` |
+| `/ugv/goal_reached` | `std_msgs/Bool` (transient local) | | `ugv_follower` |
 | `/ugv/path` | `nav_msgs/Path` (transient local) | `map` | `ugv_follower` |
 | `/ugv/cross_track_error` | `std_msgs/Float32`, m | | `ugv_follower` |
 | `/cmd_vel` | `geometry_msgs/Twist` | UGV body | `ugv_follower` |
