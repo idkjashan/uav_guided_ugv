@@ -43,6 +43,10 @@ class HeightSlicer(Node):
         self.declare_parameter('min_multi_level_cells', 1)
 
         path = os.path.expanduser(self.get_parameter('map_npz').value)
+        if not os.path.exists(path):
+            cwd_cand = os.path.join(os.getcwd(), 'maps', os.path.basename(path))
+            if os.path.exists(cwd_cand):
+                path = cwd_cand
         self.data = load_npz(path)
         self.band = float(self.get_parameter('band_m').value)
         self.frame = self.data['frame_id'] or 'map'

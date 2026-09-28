@@ -30,12 +30,18 @@ def launch_setup(context):
                                'config', 'road_survey.yaml')
     rviz_cfg = os.path.join(get_package_share_directory('road_survey'), 'rviz', 'survey.rviz')
 
+    map_path = os.path.expanduser(LaunchConfiguration('map_npz').perform(context))
+    if not os.path.exists(map_path):
+        cwd_candidate = os.path.join(os.getcwd(), 'maps', os.path.basename(map_path))
+        if os.path.exists(cwd_candidate):
+            map_path = cwd_candidate
+
     if survey:
         road = Node(package='road_survey', executable='terrain_mapper', name='terrain_mapper',
                     parameters=[road_params, sim], output='screen')
     else:
         road = Node(package='road_survey', executable='map_publisher', name='map_publisher',
-                    parameters=[{'map_npz': LaunchConfiguration('map_npz').perform(context)}, sim],
+                    parameters=[{'map_npz': map_path}, sim],
                     output='screen')
     return [
         road,
@@ -55,12 +61,15 @@ def launch_setup(context):
 
 
 def generate_launch_description():
+    repo_map = os.path.join(os.getcwd(), 'maps', 'road_map.npz')
+    default_map = repo_map if os.path.exists(repo_map) else os.path.expanduser('~/uav_guided_ugv/maps/road_map.npz')
+
     return LaunchDescription([
         SetEnvironmentVariable('ROS_DOMAIN_ID', os.environ.get('ROS_DOMAIN_ID', '42')),
         SetEnvironmentVariable('ROS_LOCALHOST_ONLY', os.environ.get('ROS_LOCALHOST_ONLY', '0')),
         DeclareLaunchArgument('survey', default_value='true',
                               description='false: skip the survey and load map_npz directly'),
-        DeclareLaunchArgument('map_npz', default_value='~/uav_guided_ugv/maps/road_map.npz'),
+        DeclareLaunchArgument('map_npz', default_value=default_map),
         DeclareLaunchArgument('params', default_value=os.path.join(
             get_package_share_directory('guidance'), 'config', 'guidance.yaml')),
         DeclareLaunchArgument('pose_check', default_value='true',

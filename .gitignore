@@ -4,10 +4,13 @@ install/
 log/
 
 # survey products
-maps/
+maps/*
+!maps/road_map.*
 bags/
 *.npz
+!maps/road_map.npz
 *.pgm
+!maps/road_map.pgm
 !docs/**/*.png
 
 # python

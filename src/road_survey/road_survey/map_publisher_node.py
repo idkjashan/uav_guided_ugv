@@ -53,6 +53,10 @@ class MapPublisher(Node):
         self.declare_parameter('republish_period_s', 0.0)
 
         path = os.path.expanduser(self.get_parameter('map_npz').value)
+        if not os.path.exists(path):
+            cwd_cand = os.path.join(os.getcwd(), 'maps', os.path.basename(path))
+            if os.path.exists(cwd_cand):
+                path = cwd_cand
         self.data = load_npz(path)
         self.frame = (self.get_parameter('frame_id').value
                       or self.data['frame_id'] or 'map')

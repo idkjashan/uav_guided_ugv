@@ -6,8 +6,9 @@
 #   ros2 bag play ~/uav_guided_ugv/bags/drdo_world1 --clock   # then run the mapper
 set -euo pipefail
 
-NAME="${1:-survey}"
-OUT="${HOME}/uav_guided_ugv/bags/${NAME}"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+BAGS_DIR="${BAGS_DIR:-$REPO_DIR/bags}"
+OUT="${BAGS_DIR}/${NAME}"
 mkdir -p "$(dirname "${OUT}")"
 
 echo "recording to ${OUT} -- Ctrl-C to stop"

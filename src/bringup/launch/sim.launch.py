@@ -35,9 +35,24 @@ def launch_setup(context):
         raise RuntimeError(f'no spawn poses for {key!r} in world_poses.yaml')
     uav, ugv = poses[key]['uav'], poses[key]['ugv']
 
-    actions = [IncludeLaunchDescription(
+    resource_path = os.pathsep.join([
+        os.path.join(px4_dir, 'Tools', 'simulation', 'gz', 'models'),
+        os.path.join(px4_dir, 'Tools', 'simulation', 'gz', 'worlds'),
+        os.path.join(worlds_pkg, 'models'),
+        os.path.join(ugv_pkg, 'models'),
+        os.environ.get('GZ_SIM_RESOURCE_PATH', ''),
+    ])
+    actions = [SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', resource_path)]
+
+    nvidia_opt = LaunchConfiguration('nvidia_gpu').perform(context).lower()
+    has_nvidia = shutil.which('nvidia-smi') is not None
+    if nvidia_opt == 'true' or (nvidia_opt == 'auto' and has_nvidia):
+        actions.append(SetEnvironmentVariable('__NV_PRIME_RENDER_OFFLOAD', '1'))
+        actions.append(SetEnvironmentVariable('__GLX_VENDOR_LIBRARY_NAME', 'nvidia'))
+
+    actions.append(IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(worlds_pkg, 'launch', 'world.launch.py')),
-        launch_arguments={'world': world}.items())]
+        launch_arguments={'world': world}.items()))
 
     actions.append(TimerAction(period=4.0, actions=[IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(ugv_pkg, 'launch', 'spawn_ackermann.launch.py')),
@@ -81,23 +96,15 @@ def launch_setup(context):
 
 
 def generate_launch_description():
-    px4 = os.path.expanduser('~/PX4-Autopilot')
-    resource_path = os.pathsep.join([
-        os.path.join(px4, 'Tools', 'simulation', 'gz', 'models'),
-        os.path.join(px4, 'Tools', 'simulation', 'gz', 'worlds'),
-        os.path.join(get_package_share_directory('drdo_gz_worlds'), 'models'),
-        os.path.join(get_package_share_directory('ackermann_gz_bringup'), 'models'),
-        os.environ.get('GZ_SIM_RESOURCE_PATH', ''),
-    ])
+    px4_default = os.environ.get('PX4_AUTOPILOT_DIR', os.path.expanduser('~/PX4-Autopilot'))
     return LaunchDescription([
         SetEnvironmentVariable('ROS_DOMAIN_ID', os.environ.get('ROS_DOMAIN_ID', '42')),
         SetEnvironmentVariable('ROS_LOCALHOST_ONLY', os.environ.get('ROS_LOCALHOST_ONLY', '0')),
-        SetEnvironmentVariable('GZ_SIM_RESOURCE_PATH', resource_path),
-        SetEnvironmentVariable('GZ_PARTITION', os.environ.get('GZ_PARTITION', 'uav_ugv')),
-        SetEnvironmentVariable('__NV_PRIME_RENDER_OFFLOAD', '1'),
-        SetEnvironmentVariable('__GLX_VENDOR_LIBRARY_NAME', 'nvidia'),
+        SetEnvironmentVariable('GZ_PARTITION', os.environ.get('GZ_PARTITION', '')),
         DeclareLaunchArgument('world', default_value='drdo_world2'),
         DeclareLaunchArgument('uav_model', default_value='gz_x500_depth_down'),
-        DeclareLaunchArgument('px4_dir', default_value=px4),
+        DeclareLaunchArgument('px4_dir', default_value=px4_default),
+        DeclareLaunchArgument('nvidia_gpu', default_value='auto',
+                              description='Enable NVIDIA GPU offload: auto, true, or false'),
         OpaqueFunction(function=launch_setup),
     ])

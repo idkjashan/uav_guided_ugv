@@ -1,0 +1,7 @@
+image: road_map.pgm
+mode: scale
+resolution: 0.25
+origin: [-137.48816523421556, -14.508923701010644, 0.0]
+negate: 0
+occupied_thresh: 0.99
+free_thresh: 0.005
