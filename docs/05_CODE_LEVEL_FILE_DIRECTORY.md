@@ -16,7 +16,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 # 1. Package: `drdo_gz_worlds`
 
 ### 1.1 `src/drdo_gz_worlds/launch/world.launch.py`
-- **Location:** [`src/drdo_gz_worlds/launch/world.launch.py`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/launch/world.launch.py)
+- **Location:** [`src/drdo_gz_worlds/launch/world.launch.py`](../src/drdo_gz_worlds/launch/world.launch.py)
 - **Role:** Launches the Gazebo Harmonic (`gz sim`) simulation server and graphical client loaded with a chosen DRDO terrain environment.
 - **Inputs:**
   - Launch Argument `world`: Name of the world SDF to load (`drdo_world1`, `drdo_world2`, `drdo_world3`).
@@ -31,7 +31,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 1.2 `src/drdo_gz_worlds/launch/uav_bridge.launch.py`
-- **Location:** [`src/drdo_gz_worlds/launch/uav_bridge.launch.py`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/launch/uav_bridge.launch.py)
+- **Location:** [`src/drdo_gz_worlds/launch/uav_bridge.launch.py`](../src/drdo_gz_worlds/launch/uav_bridge.launch.py)
 - **Role:** Bridges camera sensor buffers and simulation time from Gazebo Harmonic to ROS 2.
 - **Inputs:**
   - Gazebo topic: `/world/{world}/model/{model_name}/link/camera_link/sensor/IMX214/image`
@@ -52,7 +52,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 1.3 `src/drdo_gz_worlds/urdf/x500_depth_down.urdf`
-- **Location:** [`src/drdo_gz_worlds/urdf/x500_depth_down.urdf`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/urdf/x500_depth_down.urdf)
+- **Location:** [`src/drdo_gz_worlds/urdf/x500_depth_down.urdf`](../src/drdo_gz_worlds/urdf/x500_depth_down.urdf)
 - **Role:** Pure kinematic and visual description of the quadrotor with its downward OakD-Lite camera for TF and RViz2.
 - **Inputs:** None (static URDF XML).
 - **Code Logic:**
@@ -65,7 +65,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 1.4 `src/drdo_gz_worlds/models/x500_depth_down/model.sdf`
-- **Location:** [`src/drdo_gz_worlds/models/x500_depth_down/model.sdf`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/models/x500_depth_down/model.sdf)
+- **Location:** [`src/drdo_gz_worlds/models/x500_depth_down/model.sdf`](../src/drdo_gz_worlds/models/x500_depth_down/model.sdf)
 - **Role:** Gazebo Harmonic simulation model combining the standard PX4 `x500` quadrotor airframe with the `OakD-Lite` sensor module.
 - **Inputs:** Gazebo physics ticks.
 - **Code Logic:**
@@ -78,7 +78,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 1.5 `src/drdo_gz_worlds/px4_airframes/4022_gz_x500_depth_down`
-- **Location:** [`src/drdo_gz_worlds/px4_airframes/4022_gz_x500_depth_down`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/px4_airframes/4022_gz_x500_depth_down)
+- **Location:** [`src/drdo_gz_worlds/px4_airframes/4022_gz_x500_depth_down`](../src/drdo_gz_worlds/px4_airframes/4022_gz_x500_depth_down)
 - **Role:** PX4 POSIX airframe startup configuration script.
 - **Inputs:** Evaluated during PX4 SITL boot.
 - **Code Logic:**
@@ -93,7 +93,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 # 2. Package: `ackermann_gz_bringup`
 
 ### 2.1 `src/ackermann_gz_bringup/launch/spawn_ackermann.launch.py`
-- **Location:** [`src/ackermann_gz_bringup/launch/spawn_ackermann.launch.py`](file:///home/jashan/uav_guided_ugv/src/ackermann_gz_bringup/launch/spawn_ackermann.launch.py)
+- **Location:** [`src/ackermann_gz_bringup/launch/spawn_ackermann.launch.py`](../src/ackermann_gz_bringup/launch/spawn_ackermann.launch.py)
 - **Role:** Spawns the Ackermann ground vehicle into an active Gazebo world and sets up communication bridges.
 - **Inputs:**
   - Launch arguments: `world`, `robot_name`, `x`, `y`, `z`, `roll`, `pitch`, `yaw`.
@@ -107,7 +107,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 2.2 `src/ackermann_gz_bringup/models/ackermann_bot/model.sdf`
-- **Location:** [`src/ackermann_gz_bringup/models/ackermann_bot/model.sdf`](file:///home/jashan/uav_guided_ugv/src/ackermann_gz_bringup/models/ackermann_bot/model.sdf)
+- **Location:** [`src/ackermann_gz_bringup/models/ackermann_bot/model.sdf`](../src/ackermann_gz_bringup/models/ackermann_bot/model.sdf)
 - **Role:** Physical simulation model of the 4-wheel Ackermann ground vehicle.
 - **Inputs:** Gazebo physics ticks.
 - **Code Logic:**
@@ -121,7 +121,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 2.3 `src/ackermann_gz_bringup/urdf/ackermann_bot.urdf`
-- **Location:** [`src/ackermann_gz_bringup/urdf/ackermann_bot.urdf`](file:///home/jashan/uav_guided_ugv/src/ackermann_gz_bringup/urdf/ackermann_bot.urdf)
+- **Location:** [`src/ackermann_gz_bringup/urdf/ackermann_bot.urdf`](../src/ackermann_gz_bringup/urdf/ackermann_bot.urdf)
 - **Role:** Kinematic model of the UGV for RViz2 and ROS TF.
 - **Inputs:** None (static XML).
 - **Code Logic:**
@@ -134,7 +134,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 # 3. Package: `road_survey`
 
 ### 3.1 `src/road_survey/road_survey/depth.py`
-- **Location:** [`src/road_survey/road_survey/depth.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/depth.py)
+- **Location:** [`src/road_survey/road_survey/depth.py`](../src/road_survey/road_survey/depth.py)
 - **Role:** Low-level mathematical module for decoding depth buffers and 3D back-projection.
 - **Functions:**
   - `decode_image(msg, depth_min, depth_max)`: Converts `32FC1` image bytes into a 2D float32 array via `np.frombuffer().view(np.float32)`. Replaces NaNs, infinities, and out-of-range depths with NaN.
@@ -147,7 +147,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.2 `src/road_survey/road_survey/frames.py`
-- **Location:** [`src/road_survey/road_survey/frames.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/frames.py)
+- **Location:** [`src/road_survey/road_survey/frames.py`](../src/road_survey/road_survey/frames.py)
 - **Role:** Coordinate transformation math converting between PX4 (NED), ROS (ENU), and OpenCV (Optical).
 - **Functions:**
   - `ned_to_enu_position(p)`: Maps $(x, y, z)_{\text{ned}} \to (y, x, -z)_{\text{enu}}$.
@@ -160,8 +160,8 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.3 `src/road_survey/road_survey/grid.py`
-- **Location:** [`src/road_survey/road_survey/grid.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/grid.py)
-- **Role:** 2.5-D cumulative elevation map accumulator ([`ElevationGrid`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/grid.py#L20-L100) class).
+- **Location:** [`src/road_survey/road_survey/grid.py`](../src/road_survey/road_survey/grid.py)
+- **Role:** 2.5-D cumulative elevation map accumulator ([`ElevationGrid`](../src/road_survey/road_survey/grid.py#L20-L100) class).
 - **Inputs:** 3D world points $(X_w, Y_w, Z_w)$ in map frame.
 - **Code Logic:**
   - Allocates 2D NumPy arrays for mean elevation $\bar{z}$, sample count $N$, minimum elevation $z_{\min}$, and maximum elevation $z_{\max}$ across a $1600 \times 1600$ grid ($400\text{ m} \times 400\text{ m}$ at $0.25\text{ m}$ resolution).
@@ -173,7 +173,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.4 `src/road_survey/road_survey/risk.py`
-- **Location:** [`src/road_survey/road_survey/risk.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/risk.py)
+- **Location:** [`src/road_survey/road_survey/risk.py`](../src/road_survey/road_survey/risk.py)
 - **Role:** Purely geometric terrain hazard classifier.
 - **Inputs:** 2D elevation grid and sample count mask.
 - **Code Logic:**
@@ -188,7 +188,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.5 `src/road_survey/road_survey/costmap.py`
-- **Location:** [`src/road_survey/road_survey/costmap.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/costmap.py)
+- **Location:** [`src/road_survey/road_survey/costmap.py`](../src/road_survey/road_survey/costmap.py)
 - **Role:** Converts raw geometric classifications into Nav2-compatible costmaps.
 - **Inputs:** Binary road mask from `risk.py`.
 - **Code Logic:**
@@ -201,7 +201,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.6 `src/road_survey/road_survey/centerline.py`
-- **Location:** [`src/road_survey/road_survey/centerline.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/centerline.py)
+- **Location:** [`src/road_survey/road_survey/centerline.py`](../src/road_survey/road_survey/centerline.py)
 - **Role:** Extracts a smooth, ordered 2D reference path along the road ribbon.
 - **Inputs:** Binary road mask and start position.
 - **Code Logic:**
@@ -213,7 +213,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.7 `src/road_survey/road_survey/mapio.py`
-- **Location:** [`src/road_survey/road_survey/mapio.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/mapio.py)
+- **Location:** [`src/road_survey/road_survey/mapio.py`](../src/road_survey/road_survey/mapio.py)
 - **Role:** File serialization and deserialization for surveyed maps.
 - **Functions:**
   - `save_npz(path, costmap, elevation, risk, road_mask, metadata)`: Packages all arrays and metadata into a compressed `.npz` archive.
@@ -225,7 +225,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.8 `src/road_survey/road_survey/terrain_mapper_node.py`
-- **Location:** [`src/road_survey/road_survey/terrain_mapper_node.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/terrain_mapper_node.py)
+- **Location:** [`src/road_survey/road_survey/terrain_mapper_node.py`](../src/road_survey/road_survey/terrain_mapper_node.py)
 - **Role:** Active ROS 2 node executing the real-time aerial survey pipeline.
 - **Inputs:**
   - `/uav/depth` (`sensor_msgs/msg/Image`)
@@ -245,7 +245,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.9 `src/road_survey/road_survey/map_publisher_node.py`
-- **Location:** [`src/road_survey/road_survey/map_publisher_node.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/map_publisher_node.py)
+- **Location:** [`src/road_survey/road_survey/map_publisher_node.py`](../src/road_survey/road_survey/map_publisher_node.py)
 - **Role:** Publishes an existing pre-surveyed `.npz` costmap without flying the survey.
 - **Inputs:**
   - Parameter `map_npz`: Path to `.npz` file (with fallback to `./maps/road_map.npz`).
@@ -259,7 +259,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.10 `src/road_survey/road_survey/height_slicer_node.py`
-- **Location:** [`src/road_survey/road_survey/height_slicer_node.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/height_slicer_node.py)
+- **Location:** [`src/road_survey/road_survey/height_slicer_node.py`](../src/road_survey/road_survey/height_slicer_node.py)
 - **Role:** Dynamically filters multi-level switchbacks based on UGV altitude.
 - **Inputs:**
   - `/ugv/pose` (`geometry_msgs/msg/PoseStamped`)
@@ -274,7 +274,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 3.11 `src/road_survey/road_survey/tune_offline.py`
-- **Location:** [`src/road_survey/road_survey/tune_offline.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/tune_offline.py)
+- **Location:** [`src/road_survey/road_survey/tune_offline.py`](../src/road_survey/road_survey/tune_offline.py)
 - **Role:** Offline CLI parameter tuning utility.
 - **Inputs:** Path to a saved `road_map.npz` and command-line threshold flags (`--slope`, `--step`, `--rough`, `--thresh`, `--sweep`).
 - **Code Logic:**
@@ -287,7 +287,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 # 4. Package: `guidance`
 
 ### 4.1 `src/guidance/guidance/px4.py`
-- **Location:** [`src/guidance/guidance/px4.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/px4.py)
+- **Location:** [`src/guidance/guidance/px4.py`](../src/guidance/guidance/px4.py)
 - **Role:** Helper abstraction layer for PX4 DDS communication.
 - **Functions:**
   - `enu_position(msg)`: Converts PX4 NED local position to ENU $(x, y, z)$.
@@ -299,7 +299,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.2 `src/guidance/guidance/aruco.py`
-- **Location:** [`src/guidance/guidance/aruco.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/aruco.py)
+- **Location:** [`src/guidance/guidance/aruco.py`](../src/guidance/guidance/aruco.py)
 - **Role:** High-accuracy OpenCV ArUco detector.
 - **Functions:**
   - `detect_marker(bgr_image, marker_id, marker_length, k)`: Runs `cv2.aruco.detectMarkers()` using dictionary `DICT_4X4_50`. Solves PnP pose estimation to determine 3D translation vector $t$ and rotation vector $r$.
@@ -309,7 +309,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.3 `src/guidance/guidance/pursuit.py`
-- **Location:** [`src/guidance/guidance/pursuit.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/pursuit.py)
+- **Location:** [`src/guidance/guidance/pursuit.py`](../src/guidance/guidance/pursuit.py)
 - **Role:** Custom Regulated Pure Pursuit steering and speed controller (zero external dependencies).
 - **Classes & Functions:**
   - `Path`: Parameterizes path waypoints by cumulative arc-length chord distance; provides `project()` (fast windowed projection) and `point_at()` (linear interpolation).
@@ -320,8 +320,8 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.4 `src/guidance/guidance/explore.py`
-- **Location:** [`src/guidance/guidance/explore.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/explore.py)
-- **Role:** Autonomous aerial exploration frontier planner ([`RoadExplorer`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/explore.py#L25-L95) class).
+- **Location:** [`src/guidance/guidance/explore.py`](../src/guidance/guidance/explore.py)
+- **Role:** Autonomous aerial exploration frontier planner ([`RoadExplorer`](../src/guidance/guidance/explore.py#L25-L95) class).
 - **Inputs:** Current UAV pose and `/road/costmap`.
 - **Code Logic:**
   - Identifies forward frontier centroids along the survey heading.
@@ -333,7 +333,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.5 `src/guidance/guidance/mission.py`
-- **Location:** [`src/guidance/guidance/mission.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/mission.py)
+- **Location:** [`src/guidance/guidance/mission.py`](../src/guidance/guidance/mission.py)
 - **Role:** High-level finite state machine governing the collaborative mission.
 - **States:**
   - `INIT`: Awaiting PX4 EKF2 convergence.
@@ -348,7 +348,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.6 `src/guidance/guidance/localizer_node.py`
-- **Location:** [`src/guidance/guidance/localizer_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/localizer_node.py)
+- **Location:** [`src/guidance/guidance/localizer_node.py`](../src/guidance/guidance/localizer_node.py)
 - **Role:** Active ROS 2 node tracking the UGV from overhead camera frames.
 - **Inputs:**
   - `/uav/rgb` (`sensor_msgs/msg/Image`)
@@ -364,7 +364,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.7 `src/guidance/guidance/follower_node.py`
-- **Location:** [`src/guidance/guidance/follower_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/follower_node.py)
+- **Location:** [`src/guidance/guidance/follower_node.py`](../src/guidance/guidance/follower_node.py)
 - **Role:** Active ROS 2 node driving the UGV along the mapped road.
 - **Inputs:**
   - `/ugv/pose` (`geometry_msgs/msg/PoseStamped`)
@@ -380,7 +380,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.8 `src/guidance/guidance/mission_node.py`
-- **Location:** [`src/guidance/guidance/mission_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/mission_node.py)
+- **Location:** [`src/guidance/guidance/mission_node.py`](../src/guidance/guidance/mission_node.py)
 - **Role:** Master interactive coordinator and PX4 offboard controller.
 - **Inputs:**
   - Interactive operator terminal CLI.
@@ -394,7 +394,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 4.9 `src/guidance/guidance/pose_check_node.py`
-- **Location:** [`src/guidance/guidance/pose_check_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/pose_check_node.py)
+- **Location:** [`src/guidance/guidance/pose_check_node.py`](../src/guidance/guidance/pose_check_node.py)
 - **Role:** Real-time localization error validation node.
 - **Inputs:**
   - `/ugv/pose` (ArUco visual estimate)
@@ -410,7 +410,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 # 5. Package: `bringup`
 
 ### 5.1 `src/bringup/launch/sim.launch.py`
-- **Location:** [`src/bringup/launch/sim.launch.py`](file:///home/jashan/uav_guided_ugv/src/bringup/launch/sim.launch.py)
+- **Location:** [`src/bringup/launch/sim.launch.py`](../src/bringup/launch/sim.launch.py)
 - **Role:** Main simulation launcher bringing up the entire virtual world and vehicles.
 - **Inputs:**
   - Launch arguments: `world` (`drdo_world2`), `uav_model`, `px4_dir`, `nvidia_gpu`.
@@ -425,7 +425,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 5.2 `src/bringup/launch/mission.launch.py`
-- **Location:** [`src/bringup/launch/mission.launch.py`](file:///home/jashan/uav_guided_ugv/src/bringup/launch/mission.launch.py)
+- **Location:** [`src/bringup/launch/mission.launch.py`](../src/bringup/launch/mission.launch.py)
 - **Role:** Autonomy stack launcher.
 - **Inputs:**
   - Launch arguments: `survey` (`true`/`false`), `map_npz`, `pose_check`, `rviz`.
@@ -438,7 +438,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 5.3 `src/bringup/launch/rviz.launch.py`
-- **Location:** [`src/bringup/launch/rviz.launch.py`](file:///home/jashan/uav_guided_ugv/src/bringup/launch/rviz.launch.py)
+- **Location:** [`src/bringup/launch/rviz.launch.py`](../src/bringup/launch/rviz.launch.py)
 - **Role:** Pre-configured RViz2 visualization launcher.
 - **Inputs:** `rviz_config` (defaults to `road_survey/rviz/survey.rviz`).
 - **Code Logic:**
@@ -449,7 +449,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 5.4 `src/bringup/scripts/setup_px4_uav.sh`
-- **Location:** [`src/bringup/scripts/setup_px4_uav.sh`](file:///home/jashan/uav_guided_ugv/src/bringup/scripts/setup_px4_uav.sh)
+- **Location:** [`src/bringup/scripts/setup_px4_uav.sh`](../src/bringup/scripts/setup_px4_uav.sh)
 - **Role:** Automated PX4 model and airframe setup script.
 - **Inputs:** `$PX4_AUTOPILOT_DIR` or `$HOME/PX4-Autopilot`.
 - **Code Logic:**
@@ -463,7 +463,7 @@ This document provides an exhaustive, code-level walkthrough of every source fil
 ---
 
 ### 5.5 `src/bringup/scripts/record_survey.sh`
-- **Location:** [`src/bringup/scripts/record_survey.sh`](file:///home/jashan/uav_guided_ugv/src/bringup/scripts/record_survey.sh)
+- **Location:** [`src/bringup/scripts/record_survey.sh`](../src/bringup/scripts/record_survey.sh)
 - **Role:** Minimal survey flight rosbag recorder.
 - **Inputs:** Bag name argument.
 - **Code Logic:**

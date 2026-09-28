@@ -1,6 +1,6 @@
 # Guidance, Visual Localization & Pure Pursuit Control
 
-## 1. Overhead Visual Localization ([`aruco.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/aruco.py) & [`localizer_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/localizer_node.py))
+## 1. Overhead Visual Localization ([`aruco.py`](../src/guidance/guidance/aruco.py) & [`localizer_node.py`](../src/guidance/guidance/localizer_node.py))
 
 Ground-based GPS in steep gorges and wheel odometry on loose scree drift rapidly. To provide drift-free UGV state estimation, our architecture turns the quadrotor into an **overhead positioning satellite**.
 
@@ -23,7 +23,7 @@ Ground-based GPS in steep gorges and wheel odometry on loose scree drift rapidly
 - **Resolution at 10m AGL:** At $10\text{ m}$ altitude with the $1.274\text{ rad}$ FOV camera, the marker spans $\approx 43\text{ pixels}$ across, yielding a 100% detection rate.
 
 ### Pose Estimation Pipeline
-1. **Corner Detection:** In [`localizer_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/localizer_node.py), incoming $1920 \times 1080$ RGB frames are sampled at $15\text{ Hz}$. OpenCV's `cv2.aruco.detectMarkers()` extracts marker subpixel corners.
+1. **Corner Detection:** In [`localizer_node.py`](../src/guidance/guidance/localizer_node.py), incoming $1920 \times 1080$ RGB frames are sampled at $15\text{ Hz}$. OpenCV's `cv2.aruco.detectMarkers()` extracts marker subpixel corners.
 2. **PnP Solution:** `cv2.aruco.estimatePoseSingleMarkers()` solves the Perspective-n-Point problem using camera intrinsic matrix $K$, yielding:
    - Translation vector $t_{\text{cam}} = [x_c, y_c, z_c]^T$ from camera optical center to marker center.
    - Rodrigues rotation vector $r_{\text{cam}}$, converted to rotation matrix $R_{\text{cam}}$.
@@ -37,7 +37,7 @@ Ground-based GPS in steep gorges and wheel odometry on loose scree drift rapidly
 
 ---
 
-## 2. Zero-Dependency Regulated Pure Pursuit Controller ([`pursuit.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/pursuit.py))
+## 2. Zero-Dependency Regulated Pure Pursuit Controller ([`pursuit.py`](../src/guidance/guidance/pursuit.py))
 
 Unlike standard mobile robot stacks that import heavy Nav2 C++ controller plugins, our system features a **custom, self-contained Regulated Pure Pursuit controller** written in pure Python using NumPy.
 
@@ -83,7 +83,7 @@ $$\alpha = \text{atan2}(y_r, x_r)$$
 
 #### 5. Large Heading Error Safety Guard (In-Place Pivot)
 If the vehicle faces away from the path by more than $45.8^\circ$ ($|\alpha| > 0.8\text{ rad}$), standard pure pursuit can cause erratic maneuvers or wheel slippage.
-In [`pursuit.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/pursuit.py#L95-L101):
+In [`pursuit.py`](../src/guidance/guidance/pursuit.py#L95-L101):
 $$\text{If } |\alpha| > 0.8\text{ rad}: \quad v = 0.0\text{ m/s}, \quad \omega = \text{sign}(\alpha) \cdot 0.6\text{ rad/s}$$
 The UGV brings forward velocity to zero and pivots in-place until its heading aligns with the path.
 
@@ -114,9 +114,9 @@ In Gazebo Harmonic, the Ackermann vehicle is driven by the `gz::sim::systems::Di
 
 ---
 
-## 4. Autonomous Road Exploration Algorithm ([`explore.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/explore.py))
+## 4. Autonomous Road Exploration Algorithm ([`explore.py`](../src/guidance/guidance/explore.py))
 
-During Phase 1 autonomous survey flight, the UAV navigates without prior road knowledge via the [`RoadExplorer`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/explore.py#L25-L95) class:
+During Phase 1 autonomous survey flight, the UAV navigates without prior road knowledge via the [`RoadExplorer`](../src/guidance/guidance/explore.py#L25-L95) class:
 1. **Frontier Detection:** Scans the active road costmap ahead of the drone along the survey heading.
 2. **Centroid Extraction:** Identifies the forward-most centroid of newly classified road cells.
 3. **Lookahead Waypoint Generation:** Computes a smooth 3D setpoint $5.0\text{ m}$ ahead at the target survey altitude ($12.0\text{ m}$ AGL).
@@ -124,12 +124,24 @@ During Phase 1 autonomous survey flight, the UAV navigates without prior road kn
 
 ---
 
-## 5. Real-Time Pose Validation ([`pose_check_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/pose_check_node.py))
+## 5. Real-Time Pose Validation ([`pose_check_node.py`](../src/guidance/guidance/pose_check_node.py))
 
-To verify localization fidelity during testing, [`pose_check_node.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/pose_check_node.py) compares the visual ArUco estimate against Gazebo's physics ground truth:
+To verify localization fidelity during testing, [`pose_check_node.py`](../src/guidance/guidance/pose_check_node.py) compares the visual ArUco estimate against Gazebo's physics ground truth:
 - **Position Error:** $\Delta r = \sqrt{(x_{\text{est}} - x_{\text{gt}})^2 + (y_{\text{est}} - y_{\text{gt}})^2}$
 - **Yaw Error:** $\Delta \theta = |\theta_{\text{est}} - \theta_{\text{gt}}|$
 - **Performance Benchmark:** Across extensive multi-kilometer trials in DRDO worlds 1, 2, and 3:
   - **Median Horizontal Error:** $\mathbf{3.2\text{ cm}}$
   - **95th Percentile Horizontal Error:** $\mathbf{6.8\text{ cm}}$
   - **Yaw Error:** $<\mathbf{1.8^\circ}$
+
+---
+
+## 6. Literature Citations & Theoretical Heritage
+
+1. **Pure Pursuit Path Tracking:**
+   - Coulter, R. C. (1992). *"Implementation of the Pure Pursuit Path Tracking Algorithm"*. Carnegie Mellon University, The Robotics Institute, Tech Report CMU-RI-TR-92-01.
+2. **Regulated Pure Pursuit Controller:**
+   - Macenski, S., Singh, F., Hamlet, F., Gonn Nebril, J., & Hernandez, J. (2023). *"Regulated Pure Pursuit for Robot Path Tracking"*. Autonomous Robots, 47, 513-524. DOI: 10.1007/s10514-023-10097-4.
+3. **Overhead Drone Visual Guidance of Unmanned Ground Vehicles:**
+   - Delmerico, J., Mueggler, E., Nitsch, J., & Scaramuzza, D. (2017). *"Active Autonomous Aerial Exploration for Ground Robot Path Planning"*. IEEE Robotics and Automation Letters (RA-L), 2(2), 664-671.
+   - Saska, M., Krajnik, T., & Vonásek, V. (2014). *"Navigation, localization and stabilization of formations of unmanned aerial and ground vehicles"*. In 2014 International Conference on Unmanned Aircraft Systems (ICUAS).

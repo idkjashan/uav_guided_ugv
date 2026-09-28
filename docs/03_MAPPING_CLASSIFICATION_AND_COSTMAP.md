@@ -1,8 +1,8 @@
 # 2.5-D Mapping, Terrain Classification & Costmap Generation
 
-## 1. 2.5-D Elevation Grid Accumulator ([`grid.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/grid.py))
+## 1. 2.5-D Elevation Grid Accumulator ([`grid.py`](../src/road_survey/road_survey/grid.py))
 
-Rather than accumulating an unstructured, memory-intensive 3D voxel grid, the survey module accumulates points into an efficient **2.5-D Digital Elevation Model (DEM)** represented by the [`ElevationGrid`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/grid.py#L20-L100) class.
+Rather than accumulating an unstructured, memory-intensive 3D voxel grid, the survey module accumulates points into an efficient **2.5-D Digital Elevation Model (DEM)** represented by the [`ElevationGrid`](../src/road_survey/road_survey/grid.py#L20-L100) class.
 
 ```
        Map Grid (400m x 400m, 0.25m resolution = 1600 x 1600 cells)
@@ -35,11 +35,11 @@ Cells with $N < \text{min\_count}$ ($N < 3$) are classified as unobserved.
 
 ---
 
-## 2. Geometric Terrain Classification ([`risk.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/risk.py))
+## 2. Geometric Terrain Classification ([`risk.py`](../src/road_survey/road_survey/risk.py))
 
-Every $2.0\text{ seconds}$, [`terrain_mapper_node`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/terrain_mapper_node.py) analyzes the current elevation grid to identify traversable road surfaces versus hazardous mountain terrain.
+Every $2.0\text{ seconds}$, [`terrain_mapper_node`](../src/road_survey/road_survey/terrain_mapper_node.py) analyzes the current elevation grid to identify traversable road surfaces versus hazardous mountain terrain.
 
-Rather than relying on brittle semantic RGB color segmentation (which degrades under shadows, dust, and lighting shifts), classification is performed **purely geometrically** using local surface properties.
+Rather than relying on brittle semantic RGB color segmentation (which degrades under shadows, dust, and lighting shifts), classification is performed **purely geometrically** using local surface properties, drawing from foundational research in robotic traversability mapping (Wermelinger et al., 2016; Chilian & Hirschmüller, 2009; Papadakis, 2014).
 
 ```
           Fitted Local Plane: z = p*x + q*y + c
@@ -88,9 +88,9 @@ where $R_{\text{thresh}} = 0.35$ and $N_{\text{min}} = 3$.
 
 ---
 
-## 3. Costmap Shaping & Morphology ([`costmap.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/costmap.py))
+## 3. Costmap Shaping & Morphology ([`costmap.py`](../src/road_survey/road_survey/costmap.py))
 
-Raw geometric classification contains sensor speckle, isolated boulders, and fragmented edges. [`costmap.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/costmap.py) refines the binary mask into a navigable costmap:
+Raw geometric classification contains sensor speckle, isolated boulders, and fragmented edges. [`costmap.py`](../src/road_survey/road_survey/costmap.py) refines the binary mask into a navigable costmap:
 
 1. **Morphological Filtering:**
    - **Binary Opening** (radius $0.4\text{ m}$): Removes isolated single-pixel false positives.
@@ -111,7 +111,7 @@ The costmap is serialized into standard ROS 2 `nav_msgs/msg/OccupancyGrid` forma
 
 ---
 
-## 4. Multi-Level Road Slicing ([`height_slicer_node.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/height_slicer_node.py))
+## 4. Multi-Level Road Slicing ([`height_slicer_node.py`](../src/road_survey/road_survey/height_slicer_node.py))
 
 In steep mountain switchbacks, hairpin bends often pass directly above or below one another with only a few meters of horizontal separation:
 
@@ -123,7 +123,7 @@ In steep mountain switchbacks, hairpin bends often pass directly above or below 
 
 In a traditional 2D costmap projection, the upper and lower roads overlap, causing global path planners to jump vertically between switchback tiers.
 
-The [`height_slicer_node`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/height_slicer_node.py) solves this:
+The [`height_slicer_node`](../src/road_survey/road_survey/height_slicer_node.py) solves this:
 - Subscribes to the UGV's current 3D pose (`/ugv/pose`).
 - Obtains the UGV's current altitude $Z_{\text{ugv}}$.
 - Filters the 2.5-D elevation grid to keep only cells satisfying:
@@ -132,9 +132,35 @@ The [`height_slicer_node`](file:///home/jashan/uav_guided_ugv/src/road_survey/ro
 
 ---
 
-## 5. Road Centerline Extraction ([`centerline.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/centerline.py))
+## 5. Road Centerline Extraction ([`centerline.py`](../src/road_survey/road_survey/centerline.py))
 
 To generate a drivable reference trajectory for pure pursuit:
 1. **Medial Axis Skeletonization:** Applies the Lee-94 topological skeletonization algorithm (`skimage.morphology.skeletonize`) to the binary road mask, thinning the road ribbon to a 1-pixel-wide topological centerline.
 2. **Graph Traversal:** Converts the pixel skeleton into an adjacency graph, searches for the longest continuous path beginning at the vehicle's initial pose, and terminates at the furthest road frontier.
 3. **Spline Smoothing:** Resamples the discrete pixel graph into evenly spaced metric waypoints with $0.25\text{ m}$ chord spacing, published as `nav_msgs/msg/Path` on `/ugv/path`.
+
+---
+
+## 6. Theoretical Foundations & Prior Art Citations
+
+The geometric risk calculation and multi-layer costmap architecture implemented in `road_survey` directly build upon established robotics literature in terrain traversability analysis:
+
+1. **ETH Zurich Autonomous Systems Lab (ASL) / ANYbotics:**
+   - **Repository:** [`ANYbotics/elevation_mapping`](https://github.com/ANYbotics/elevation_mapping) and [`ANYbotics/grid_map`](https://github.com/ANYbotics/grid_map)
+   - **Key Publications:**
+     - Fankhauser, P., Bloesch, M., Rodriguez, D., Kaestner, R., Hutter, M., & Siegwart, R. (2014). *"Robot-Centric Elevation Mapping with Uncertainty Estimates"*. In Mobile Service Robotics (CLAWAR 2014).
+     - Wermelinger, M., Fankhauser, P., Diethelm, R., Krüsi, P., Siegwart, R., & Hutter, M. (2016). *"Navigation planning on 2.5D elevation maps for complex terrains"*. In 2016 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS).
+   - **Theoretical Parallels:** Our surface normal calculation via local $3 \times 3$ patch plane fitting, slope calculation ($\theta = \arccos n_z$), step height estimation, and multi-layer grid representation are mathematically equivalent to the traversability filters in ANYbotics' `grid_map_filters`.
+
+2. **DLR (German Aerospace Center) Institute of Robotics and Mechatronics:**
+   - **Key Publication:** Chilian, A., & Hirschmüller, H. (2009). *"Multisensor Terrain Mapping and Persistent Traversability Analysis for Robotic Exploration"*. In 2009 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS).
+   - **Theoretical Parallels:** Introduces the canonical triad of local geometric hazard assessment—**slope**, **step height**, and **roughness (residual variance)**—combined with Euclidean distance transforms to produce safe standoff costmaps for ground rovers.
+
+3. **University of Zurich / Robotics and Perception Group (RPG):**
+   - **Key Publication:** Delmerico, J., Mueggler, E., Nitsch, J., & Scaramuzza, D. (2017). *"Active Autonomous Aerial Exploration for Ground Robot Path Planning"*. In IEEE Robotics and Automation Letters (RA-L), 2(2), 664-671.
+   - **Theoretical Parallels:** Uses an autonomous micro aerial vehicle (MAV) flying above rough terrain to compute elevation maps and traversability costmaps, dynamically planning safe trajectories for an accompanying ground robot.
+
+4. **UGV Geometric Traversability Taxonomy:**
+   - **Key Publication:** Papadakis, P. (2014). *"Terrain traversability analysis methods for unmanned ground vehicles: A survey"*. Engineering Applications of Artificial Intelligence, 30, 137-154.
+
+For detailed mathematical comparisons, algorithmic lineage, and architectural differences, see [06_REFERENCE_REPOSITORIES_AND_PRIOR_ART.md](06_REFERENCE_REPOSITORIES_AND_PRIOR_ART.md).

@@ -26,7 +26,7 @@ In simulation, modeling two independent cameras and computing software stereo di
   2. `<sensor name="StereoOV7251" type="depth_camera">`: Uses Gazebo's GPU ray-caster to directly generate an analytical metric depth buffer.
 
 ### Physical Mounting & Nadir Pitch
-In [`x500_depth_down/model.sdf`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/models/x500_depth_down/model.sdf) and [`x500_depth_down.urdf`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/urdf/x500_depth_down.urdf):
+In [`x500_depth_down/model.sdf`](../src/drdo_gz_worlds/models/x500_depth_down/model.sdf) and [`x500_depth_down.urdf`](../src/drdo_gz_worlds/urdf/x500_depth_down.urdf):
 - **Translation:** $X = +0.12\text{ m}$, $Y = +0.03\text{ m}$, $Z = +0.242\text{ m}$ relative to the drone's `base_link`.
 - **Orientation:** $\text{Roll} = 0.0$, $\text{Pitch} = +1.570796\text{ rad}$ ($+90^\circ$), $\text{Yaw} = 0.0$.
 - Because drone body axes are FLU ($+X$ forward), pitching $+90^\circ$ points the optical axis **vertically downward (nadir)** toward the ground.
@@ -39,7 +39,7 @@ Below is the complete sensor data pipeline, illustrating how raw simulation buff
 
 ![Sensor Flow](fig_sensor_flow.png)
 
-### Topic Bridging Configuration ([`uav_bridge.launch.py`](file:///home/jashan/uav_guided_ugv/src/drdo_gz_worlds/launch/uav_bridge.launch.py))
+### Topic Bridging Configuration ([`uav_bridge.launch.py`](../src/drdo_gz_worlds/launch/uav_bridge.launch.py))
 The `ros_gz_bridge` process forwards camera streams across the simulation boundary:
 
 | Sensor | Gazebo Harmonic Topic | ROS 2 Bridged Topic | ROS 2 Message Type |
@@ -52,7 +52,7 @@ The `ros_gz_bridge` process forwards camera streams across the simulation bounda
 
 ---
 
-## 3. Why the Raw Depth Image Looks Pitch Black
+## 3. Depth Camera Encoding and Decoding
 
 A common source of confusion when first visualizing `/uav/depth` in standard tools (RViz default image viewer, web browsers, or OpenCV `cv2.imshow()`) is that the image appears completely solid black.
 
@@ -72,7 +72,7 @@ A common source of confusion when first visualizing `/uav/depth` in standard too
 
 ## 4. Code-Level Depth Decoding (`road_survey/depth.py`)
 
-In [`src/road_survey/road_survey/depth.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/depth.py), incoming ROS 2 `Image` messages are unpacked without copying memory:
+In [`src/road_survey/road_survey/depth.py`](../src/road_survey/road_survey/depth.py), incoming ROS 2 `Image` messages are unpacked without copying memory:
 
 ```python
 def decode_image(msg: Image, depth_min: float = 0.4, depth_max: float = 18.0) -> np.ndarray:
@@ -134,7 +134,7 @@ $$P_{\text{map}} = T_{\text{map}}^{\text{body}} \cdot T_{\text{body}}^{\text{cam
 3. **$T_{\text{map}}^{\text{body}}$:** Real-time drone position $(x, y, z)$ and attitude quaternion $(q_w, q_x, q_y, q_z)$ from PX4 SITL, converted from NED to ENU.
 
 ### Step 4: ROS 2 PointCloud2 Generation
-In [`terrain_mapper_node.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/terrain_mapper_node.py), the transformed points are packaged into standard ROS 2 format:
+In [`terrain_mapper_node.py`](../src/road_survey/road_survey/terrain_mapper_node.py), the transformed points are packaged into standard ROS 2 format:
 
 ```python
 # Create sensor_msgs/msg/PointCloud2 with fields [x, y, z] float32
@@ -155,7 +155,7 @@ Gazebo Harmonic has the internal capability to output `/depth_camera/points` (`g
 - **2D Depth Image Overhead:** Transmitting the 2D depth image requires only $640 \times 480 \times 4\text{ bytes} \times 30\text{ fps} \approx \mathbf{36.8\text{ MB/second}}$ (less than 25% of the data rate).
 
 ### On-Demand Downsampling
-By performing unprojection inside [`terrain_mapper_node`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/terrain_mapper_node.py):
+By performing unprojection inside [`terrain_mapper_node`](../src/road_survey/road_survey/terrain_mapper_node.py):
 1. Integration is throttled from $30\text{ Hz}$ to **$5\text{ Hz}$**.
 2. A pixel stride of 2 is applied (sampling every 2nd row and column), reducing point count from 307,200 to ~76,800 points per frame.
 3. Unprojection is skipped entirely when the drone is stationary or banking heavily ($>25^\circ$).

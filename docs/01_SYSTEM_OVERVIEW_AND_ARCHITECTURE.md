@@ -37,7 +37,7 @@ To solve this, our system employs an **aerial-ground collaborative architecture*
 - The UAV takes off to a survey altitude of **$12\text{ m}$ Above Ground Level (AGL)**.
 - It translates along the expected road corridor (either autonomously via `explore.py` frontier tracking or manually via keyboard teleoperation).
 - The downward-facing depth camera streams $640 \times 480$ metric depth frames at $30\text{ Hz}$.
-- [`terrain_mapper_node`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/terrain_mapper_node.py) throttles integration to $5\text{ Hz}$, unprojects depth frames into 3D world coordinates using PX4 local position and attitude, and accumulates elevations into a $400 \times 400\text{ m}$ grid with $0.25\text{ m}$ cell resolution.
+- [`terrain_mapper_node`](../src/road_survey/road_survey/terrain_mapper_node.py) throttles integration to $5\text{ Hz}$, unprojects depth frames into 3D world coordinates using PX4 local position and attitude, and accumulates elevations into a $400 \times 400\text{ m}$ grid with $0.25\text{ m}$ cell resolution.
 - Every $2\text{ seconds}$, a plane-fitting classification algorithm evaluates terrain slope, step hazards, and surface roughness, producing a binary road mask and a 2D Euclidean Distance Transform costmap.
 - The survey can be concluded at the road terminus or stopped early by the operator; the system saves `road_map.npz`, `road_map.yaml`, and `road_map.pgm`.
 
@@ -48,8 +48,8 @@ To solve this, our system employs an **aerial-ground collaborative architecture*
 - Once detected, the UAV centers itself directly above the marker, providing an unobstructed overhead bird's-eye view.
 
 ### Phase 3: Overhead Visual Localization & Regulated Pure Pursuit Guidance
-- **Visual Localization:** [`ugv_localizer_node`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/localizer_node.py) processes $1920 \times 1080$ RGB frames at $15\text{ Hz}$, detects the marker corners, solves the Perspective-n-Point (PnP) problem, and transforms the marker pose into the world `map` frame (`/ugv/pose`).
-- **Centerline Extraction:** [`follower_node`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/follower_node.py) extracts the medial axis skeleton of the traversable road costmap, parameterizing the path as an arc-length spline.
+- **Visual Localization:** [`ugv_localizer_node`](../src/guidance/guidance/localizer_node.py) processes $1920 \times 1080$ RGB frames at $15\text{ Hz}$, detects the marker corners, solves the Perspective-n-Point (PnP) problem, and transforms the marker pose into the world `map` frame (`/ugv/pose`).
+- **Centerline Extraction:** [`follower_node`](../src/guidance/guidance/follower_node.py) extracts the medial axis skeleton of the traversable road costmap, parameterizing the path as an arc-length spline.
 - **Pure Pursuit Steering:** Using our custom, zero-dependency Regulated Pure Pursuit algorithm, the node computes target lookahead points ($L_d = 1.5\text{ m}$), calculates steering curvature, regulates velocity based on turning radius, and issues velocity commands (`/cmd_vel`) to the Ackermann UGV.
 - **Coordinated Formation:** As the UGV navigates the road, the UAV follows overhead, dynamically updating its position setpoint to keep the UGV centered in its optical field of view.
 
@@ -99,7 +99,7 @@ The system adheres strictly to **ROS REP-103** (Standard Units and Coordinate Co
 | `aruco_marker_link`| FLU ($+X$ Forward, $+Y$ Left, $+Z$ Up) | Center of the top surface of the roof-mounted ArUco marker ($Z = +0.1275\text{ m}$ above chassis). |
 
 ### PX4 NED to ROS ENU Transformation
-PX4 operates natively in the **North-East-Down (NED)** aerospace convention. All PX4 topics are converted to **East-North-Up (ENU)** by [`px4.py`](file:///home/jashan/uav_guided_ugv/src/guidance/guidance/px4.py) and [`frames.py`](file:///home/jashan/uav_guided_ugv/src/road_survey/road_survey/frames.py):
+PX4 operates natively in the **North-East-Down (NED)** aerospace convention. All PX4 topics are converted to **East-North-Up (ENU)** by [`px4.py`](../src/guidance/guidance/px4.py) and [`frames.py`](../src/road_survey/road_survey/frames.py):
 
 $$\begin{bmatrix} x_{\text{enu}} \\ y_{\text{enu}} \\ z_{\text{enu}} \end{bmatrix} = \begin{bmatrix} 0 & 1 & 0 \\ 1 & 0 & 0 \\ 0 & 0 & -1 \end{bmatrix} \begin{bmatrix} x_{\text{ned}} \\ y_{\text{ned}} \\ z_{\text{ned}} \end{bmatrix}$$
 
