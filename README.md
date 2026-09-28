@@ -14,7 +14,7 @@ TAKEOFF -> SURVEY -> RETURN -> ACQUIRE -> TRACK -> DONE
            road       the way   marker     UAV stays 10 m above it
 ```
 
-Technical specification & architecture: [docs/ARCHITECTURE_AND_APPROACH.md](docs/ARCHITECTURE_AND_APPROACH.md).
+Technical specification & documentation suite: [docs/README.md](docs/README.md).
 
 ```
 uav_guided_ugv/
@@ -23,14 +23,16 @@ uav_guided_ugv/
 │   ├── guidance/               # stage 2: interactive mission, ArUco UGV pose, UGV path follower
 │   ├── bringup/                # sim.launch.py, mission.launch.py, rviz.launch.py, world configs
 │   ├── drdo_gz_worlds/         # DRDO Gazebo worlds, x500_depth_down UAV model, camera bridge
-│   └── ackermann_gz_bringup/   # skid-steer UGV model with its roof marker
+│   └── ackermann_gz_bringup/   # 4-wheel UGV model with its roof ArUco marker
 ├── docs/
-│   ├── ARCHITECTURE_AND_APPROACH.md   # nodes, topics, states, frames, data
-│   ├── 01_road_survey_plan.md         # how the road is detected, and why
-│   ├── 02_guidance.md                 # survey, return, localise and guide, and why
-│   ├── HANDOFF.md                     # bring-up checklist and troubleshooting
-│   └── SYSTEM_ENVIRONMENT.md          # machine, versions, frames
-└── maps/                              # survey output (.npz, .pgm, .yaml, .png), not tracked
+│   ├── README.md                               # documentation master index
+│   ├── 01_SYSTEM_OVERVIEW_AND_ARCHITECTURE.md  # mission phases, topology, frames, REP standards
+│   ├── 02_SENSOR_STACK_AND_DEPTH_PIPELINE.md   # dual camera URDF/SDF, 32FC1 depth, point cloud
+│   ├── 03_MAPPING_CLASSIFICATION_AND_COSTMAP.md# 2.5D DEM, geometric risk, morphology, slicing
+│   ├── 04_GUIDANCE_LOCALIZATION_AND_CONTROL.md # ArUco tracking, pure pursuit math, frontier search
+│   ├── 05_CODE_LEVEL_FILE_DIRECTORY.md         # exhaustive code-level breakdown of every file
+│   └── 06_REFERENCE_REPOSITORIES_AND_PRIOR_ART.# upstream repos, Nav2 comparison, citations
+└── maps/                                       # pre-surveyed road map (.npz, .pgm, .yaml, .png)
 ```
 
 ## ROS Domain ID Setup
